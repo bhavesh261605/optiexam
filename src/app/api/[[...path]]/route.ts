@@ -35,12 +35,9 @@ const examSchema = z.object({
   kind: z.enum(["assigned", "mock", "practice"]),
   status: z.enum(["draft", "published"]),
   questionIds: z.array(z.string()).min(1).max(100),
-  assigned: z.array(z.enum(["candidate-demo", "candidate-two"])),
+  assigned: z.array(z.string().min(1)).max(1000),
   extraMinutes: z
-    .partialRecord(
-      z.enum(["candidate-demo", "candidate-two"]),
-      z.number().int().min(0).max(180),
-    )
+    .record(z.string(), z.number().int().min(0).max(180))
     .optional(),
   shuffleQuestions: z.boolean().optional(),
 });
@@ -57,6 +54,36 @@ async function handle(req: NextRequest) {
         );
     }
     const token = req.cookies.get("aura_session")?.value;
+    if ((path[0] === "register" || path[0] === "signin") && method === "POST") {
+      const body = z
+        .object({
+          email: z.string().trim().toLowerCase().email().max(254),
+          password: z
+            .string()
+            .min(path[0] === "register" ? 12 : 1)
+            .max(128),
+          name: z.string().trim().min(2).max(80).optional(),
+        })
+        .parse(await req.json());
+      if (path[0] === "register" && !body.name)
+        throw new store.ApiError("Enter your full name.");
+      const result =
+        path[0] === "register"
+          ? await store.register(body.name!, body.email, body.password)
+          : await store.authenticate(body.email, body.password);
+      const response = NextResponse.json(
+        { user: result.user },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+      response.cookies.set("aura_session", result.token, {
+        httpOnly: true,
+        sameSite: "strict",
+        secure: req.nextUrl.protocol === "https:",
+        path: "/",
+        maxAge: 86400,
+      });
+      return response;
+    }
     if (path[0] === "login" && method === "POST") {
       if (process.env.VERCEL)
         throw new store.ApiError(
@@ -93,7 +120,17 @@ async function handle(req: NextRequest) {
       });
     if (!user) throw new store.ApiError("Please sign in to continue.", 401);
     let data: unknown;
-    if (path[0] === "preferences" && (method === "GET" || method === "PUT"))
+    if (path[0] === "profile" && method === "PUT")
+      data = store.updateProfile(
+        user,
+        z
+          .object({ name: z.string().trim().min(2).max(80) })
+          .parse(await req.json()).name,
+      );
+    else if (
+      path[0] === "preferences" &&
+      (method === "GET" || method === "PUT")
+    )
       data = store.preferences(
         user,
         method === "PUT" ? prefsSchema.parse(await req.json()) : undefined,
@@ -186,3 +223,4 @@ async function handle(req: NextRequest) {
 export const GET = handle;
 export const POST = handle;
 export const PUT = handle;
+

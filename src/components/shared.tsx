@@ -1,6 +1,6 @@
 "use client";
 import * as Dialog from "@radix-ui/react-dialog";
-import { X, ArrowRight, Volume2, Check, Accessibility } from "lucide-react";
+import { X, ArrowRight, Volume2, Check, Settings2 } from "lucide-react";
 import { useState, useRef } from "react";
 import type { Preferences } from "@/lib/types";
 export async function api<T>(
@@ -238,7 +238,7 @@ export function PreferencesForm({
   );
 }
 function KeyboardHint() {
-  return <Accessibility size={23} aria-hidden="true" />;
+  return <Settings2 size={23} aria-hidden="true" />;
 }
 export function PageHeading({
   eyebrow,
@@ -271,7 +271,7 @@ export function Empty({
 }) {
   return (
     <div className="empty-state">
-      <Accessibility size={26} />
+      <Settings2 size={26} />
       <h3>{title}</h3>
       <p>{children}</p>
     </div>

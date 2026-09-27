@@ -742,4 +742,338 @@
   background: #000;
 }
 
-.brand-symbol { display: block; width: 76px; height: 76px; object-fit: contain; background: #fff; border-radius: 8px; }
+.brand-symbol {
+  display: block;
+  width: 76px;
+  height: 76px;
+  object-fit: contain;
+  background: #fff;
+  border-radius: 8px;
+}
+/* Public entry and account pages: quiet contrast, large targets, one reading order. */
+.public-site {
+  min-height: 100vh;
+  background: var(--surface);
+}
+.public-header {
+  max-width: 1240px;
+  margin: auto;
+  padding: 20px 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+}
+.public-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--ink);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+.public-brand img {
+  background: white;
+  border-radius: 6px;
+}
+.public-header nav {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+.public-header nav > a {
+  font-weight: 600;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+}
+.reading-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px 24px;
+  flex-wrap: wrap;
+  padding: 14px 24px;
+  background: var(--bg);
+  border-block: 1px solid var(--line);
+}
+.reading-bar > span,
+.reading-bar label {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  margin: 0;
+}
+.reading-bar > span {
+  font-weight: 600;
+}
+.reading-bar input {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--blue);
+}
+.reading-bar select {
+  min-height: 46px;
+  padding: 8px 12px;
+}
+.landing-main {
+  max-width: 1240px;
+  margin: auto;
+  padding: 0 32px;
+}
+.landing-hero {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr;
+  gap: 72px;
+  align-items: center;
+  padding: 76px 0;
+}
+.landing-hero h1 {
+  font-size: clamp(2.2rem, 4vw, 3.5rem);
+  line-height: 1.15;
+  letter-spacing: -0.045em;
+  margin-bottom: 26px;
+}
+.hero-description {
+  font-size: 1.125rem;
+  line-height: 1.85;
+  max-width: 620px;
+}
+.hero-actions {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 30px 0 16px;
+}
+.public-site .button {
+  min-height: 50px;
+}
+.quiet-note {
+  font-size: 0.875rem;
+  color: var(--muted);
+  margin-top: 20px;
+}
+.start-guide {
+  padding: 32px;
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--blue);
+  background: var(--bg);
+  border-radius: 8px;
+}
+.guide-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  color: var(--muted);
+}
+.start-guide h2 {
+  font-size: 1.35rem;
+  margin: 14px 0 26px;
+}
+.start-guide ol {
+  padding-left: 26px;
+  margin: 0;
+}
+.start-guide li {
+  padding-left: 9px;
+  margin-top: 22px;
+}
+.start-guide li::marker {
+  font-weight: 700;
+  color: var(--blue);
+}
+.start-guide li p {
+  margin: 7px 0 0;
+}
+.access-principles {
+  padding: 40px 0;
+  border-top: 1px solid var(--line);
+}
+.access-principles > h2 {
+  font-size: 1.65rem;
+  margin-bottom: 32px;
+}
+.principles-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 40px;
+}
+.principles-grid article > svg {
+  color: var(--blue);
+  margin-bottom: 18px;
+}
+.principles-grid h3 {
+  font-size: 1.1rem;
+}
+.public-help {
+  border-top: 1px solid var(--line);
+  padding: 40px 0;
+}
+.public-help > p {
+  max-width: 700px;
+}
+.public-help details {
+  margin-top: 24px;
+}
+.public-help summary {
+  cursor: pointer;
+  padding: 12px 0;
+  color: var(--blue);
+  width: fit-content;
+}
+.public-footer {
+  max-width: 1240px;
+  margin: auto;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: space-between;
+  padding: 28px 32px;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.account-main {
+  background: var(--bg);
+  padding: 48px 24px 64px;
+}
+.account-panel {
+  max-width: 600px;
+  margin: auto;
+  padding: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.back-link {
+  display: inline-block;
+  padding: 8px 0;
+  margin-bottom: 22px;
+}
+.account-panel h1 {
+  font-size: 1.9rem;
+}
+.form-instructions {
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9375rem;
+}
+.account-panel form > label,
+.profile-form > label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-weight: 600;
+  margin: 20px 0;
+}
+.account-panel input,
+.profile-form input {
+  width: 100%;
+  min-height: 52px;
+  padding: 12px;
+  font-weight: 400;
+}
+.password-help {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+.password-help button {
+  min-height: 44px;
+}
+.submit-account {
+  width: 100%;
+  margin-top: 24px;
+  justify-content: center;
+}
+.account-switch {
+  border-top: 1px solid var(--line);
+  padding-top: 22px;
+  margin-top: 28px;
+}
+.form-error {
+  border: 2px solid #b91c1c;
+  padding: 14px;
+  color: var(--ink);
+  margin-top: 20px;
+}
+.profile-page {
+  max-width: 850px;
+}
+.profile-page > .panel {
+  margin-top: 28px;
+}
+.profile-form {
+  max-width: 600px;
+}
+.account-details {
+  margin: 24px 0;
+  overflow-wrap: anywhere;
+}
+.account-details dt {
+  font-weight: 600;
+  margin-top: 18px;
+}
+.account-details dd {
+  margin: 5px 0;
+  color: var(--muted);
+}
+[data-contrast="high"] .form-error {
+  border-color: #ffeb3b;
+}
+@media (max-width: 900px) {
+  .landing-hero {
+    grid-template-columns: 1fr;
+    gap: 34px;
+    padding: 44px 0;
+  }
+  .principles-grid {
+    grid-template-columns: 1fr;
+    gap: 26px;
+  }
+  .public-header {
+    flex-wrap: wrap;
+    padding: 20px;
+  }
+  .public-header nav {
+    gap: 20px;
+  }
+  .landing-main {
+    padding: 0 22px;
+  }
+}
+@media (max-width: 600px) {
+  .account-panel {
+    padding: 24px 18px;
+  }
+  .account-main {
+    padding: 28px 14px;
+  }
+  .reading-bar {
+    justify-content: flex-start;
+    gap: 12px 18px;
+  }
+  .reading-bar > span {
+    width: 100%;
+  }
+  .start-guide {
+    padding: 24px;
+  }
+  .hero-actions {
+    flex-direction: column;
+  }
+}
+[data-large-text="true"] .landing-hero,
+[data-large-text="true"] .principles-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+[data-large-text="true"] .public-header {
+  flex-wrap: wrap;
+}
+
+.account-switch a, .back-link { text-decoration: underline; text-underline-offset: 3px; }

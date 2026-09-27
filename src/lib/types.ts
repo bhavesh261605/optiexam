@@ -1,5 +1,5 @@
 export type Role = "candidate" | "admin";
-export type User = { id: string; name: string; role: Role };
+export type User = { id: string; name: string; email?: string; role: Role };
 export type Preferences = {
   contrast: boolean;
   scale: number;

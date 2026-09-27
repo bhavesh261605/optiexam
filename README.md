@@ -20,7 +20,7 @@ npm run build
 npm start
 ```
 
-The server binds to `127.0.0.1` by default. Use the candidate or administrator workspace button to enter a demo session. No passwords or external services are needed.
+The server binds to `127.0.0.1` by default. Start at the landing page. Create a candidate account with your name, email and a password (12–128 characters), or log in to an existing account. Accounts are stored in the local SQLite database. The sample candidate workspace and expandable administrator demo remain available below the landing-page introduction.
 
 ## Try the candidate journey
 
@@ -93,8 +93,8 @@ The suite covers a keyboard-only candidate journey, save failure and recovery, r
 **This is not a production-ready or WCAG-certified MVP.** The following referenced requirements remain future work:
 
 - Supabase Auth, PostgreSQL migrations, and Row Level Security. The local store and demo identity are real working substitutes for prototyping, not implementations of Supabase.
-- Production registration, account recovery, administrative provisioning, and rate limiting. Anyone with local demo access can select the administrator role by design. Demo login is disabled when `VERCEL` is set.
-- Vercel deployment, hosted database configuration, and CI/CD. Local SQLite must be replaced before deploying to ephemeral/serverless hosting.
+- Email verification, password recovery, production identity operations, administrative provisioning, and deployment-wide abuse protection. Local registration and password sign-in use salted scrypt hashes and a ten-attempt email limit per fifteen-minute window. Anyone with local demo access can select the administrator role by design. Demo login is disabled when `VERCEL` is set.
+- Vercel deployment and hosted database configuration. A GitHub Actions workflow checks the source. Local SQLite must be replaced before deploying to ephemeral/serverless hosting.
 - Manual NVDA testing on Windows and usability testing with assistive-technology users. Automated axe and keyboard checks do not establish full WCAG conformance.
 - Accommodation request/approval workflows, scheduled breaks, and availability windows. Candidate-specific extra time is implemented.
 - Image uploads, AI descriptions, speech-to-text, multilingual UI, and additional question types.
@@ -120,7 +120,7 @@ The input documents were treated as product references. Their checklists do not 
 
 ## OptiExam update
 
-The current version adds an untimed Access Lab, a screen-reader preset, NVDA guidance, a unified journey bar, and a Learning Insights page. Administrators can configure candidate-specific extra minutes and randomize question order. These settings are applied when a new attempt starts. Existing attempts keep their original deadline and question order.
+The current version adds an untimed Access Lab, a screen-reader preset, NVDA guidance, reading preferences before login, and a Learning Insights page. Administrators can configure candidate-specific extra minutes and randomize question order. These settings are applied when a new attempt starts. Existing attempts keep their original deadline and question order.
 
 Results now show descriptive access context and optional self-reported barriers. Administrators can review the feedback alongside scores. No disability score, reading-speed ranking, surveillance, or assistive-tool misconduct detection is implemented.
 
@@ -129,3 +129,9 @@ See `RESEARCH-AND-CHANGES.md` for the Pearson, Perkins, Harvard, and NV Access s
 ## Team development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, branches, pull requests, collaborator access, and automated checks. Local databases and demo sessions are excluded from Git.
+
+## Landing page and accounts
+
+The public entry routes are `/`, `/login`, and `/signup`. Signed-in candidates reach their dashboard; `/profile` lets each user edit their own name and save reading/navigation preferences. Email is displayed read-only. New accounts are always candidates; administrators can assign exams to registered candidates. The untimed Access Lab and open practice tests are available immediately. Existing demo accounts and exam data remain intact.
+
+Passwords support paste, browser autofill and an explicit show/hide control. Forms have persistent labels, native validation, and focused server-error summaries. High contrast and text-size controls are available before sign-in. Existing users retain saved preferences on login. Local registration is functional, but email ownership is not verified and password recovery is not implemented.

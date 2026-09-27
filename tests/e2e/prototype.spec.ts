@@ -179,6 +179,7 @@ test("admin creates a question, publishes an assigned exam, and inspects results
   page,
 }) => {
   await page.goto("/");
+  await page.getByText("Administrator demo", { exact: true }).click();
   await page.getByRole("button", { name: "Administrator workspace" }).click();
   await page.getByRole("link", { name: "Question bank", exact: true }).click();
   await page.getByRole("button", { name: "New question" }).click();

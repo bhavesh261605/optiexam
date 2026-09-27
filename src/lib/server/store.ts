@@ -1,7 +1,14 @@
+import { promisify } from "node:util";
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { randomUUID, randomBytes, randomInt } from "node:crypto";
+import {
+  randomUUID,
+  randomBytes,
+  randomInt,
+  scrypt,
+  timingSafeEqual,
+} from "node:crypto";
 import { evaluate, canWrite } from "../engine";
 import {
   defaultPreferences,
@@ -28,6 +35,9 @@ CREATE TABLE IF NOT EXISTS exams(id TEXT PRIMARY KEY,data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS attempts(id TEXT PRIMARY KEY,userId TEXT NOT NULL,examId TEXT NOT NULL,data TEXT NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS one_attempt_per_exam ON attempts(userId,examId);
 CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY,actor TEXT NOT NULL,event TEXT NOT NULL,detail TEXT NOT NULL,at INTEGER NOT NULL);`);
+db.exec(`CREATE TABLE IF NOT EXISTS credentials(userId TEXT PRIMARY KEY REFERENCES users(id), email TEXT UNIQUE NOT NULL, salt TEXT NOT NULL, hash TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS auth_limits(email TEXT PRIMARY KEY, count INTEGER NOT NULL, resetAt INTEGER NOT NULL);`);
+const deriveKey = promisify(scrypt);
 const parse = <T>(row: unknown): T | undefined =>
   row ? (JSON.parse((row as { data: string }).data) as T) : undefined;
 function transaction<T>(fn: () => T): T {
@@ -250,7 +260,9 @@ for (const [id, previous, name] of [
 }
 export function login(id: string) {
   const user = db
-    .prepare("SELECT id,name,role FROM users WHERE id=?")
+    .prepare(
+      "SELECT u.id,u.name,u.role,c.email FROM users u LEFT JOIN credentials c ON c.userId=u.id WHERE u.id=?",
+    )
     .get(id) as User | undefined;
   if (!user) throw new ApiError("Unknown demo account.");
   const token = randomBytes(32).toString("hex");
@@ -266,7 +278,7 @@ export function session(token?: string): User | undefined {
   if (!token) return;
   return db
     .prepare(
-      "SELECT u.id,u.name,u.role FROM users u JOIN sessions s ON s.userId=u.id WHERE s.token=? AND s.expires>?",
+      "SELECT u.id,u.name,u.role,c.email FROM users u JOIN sessions s ON s.userId=u.id LEFT JOIN credentials c ON c.userId=u.id WHERE s.token=? AND s.expires>?",
     )
     .get(token, Date.now()) as User | undefined;
 }
@@ -489,6 +501,17 @@ export function putExam(user: User, e: Omit<Exam, "id"> & { id?: string }) {
     throw new ApiError("One or more questions are unavailable.");
   if (new Set(e.questionIds).size !== e.questionIds.length)
     throw new ApiError("Questions must be unique.");
+  if (
+    e.assigned.some(
+      (id) =>
+        !db
+          .prepare("SELECT id FROM users WHERE id=? AND role='candidate'")
+          .get(id),
+    )
+  )
+    throw new ApiError("Choose existing candidate accounts.");
+  if (Object.keys(e.extraMinutes || {}).some((id) => !e.assigned.includes(id)))
+    throw new ApiError("Extra time must belong to an assigned candidate.");
   const exam = { ...e, id: e.id || randomUUID() };
   db.prepare("INSERT OR REPLACE INTO exams VALUES(?,?)").run(
     exam.id,
@@ -514,4 +537,72 @@ export function adminOverview() {
     results: attempts.filter((a) => a.status === "evaluated").map(safeAttempt),
     audit: db.prepare("SELECT * FROM audit ORDER BY id DESC LIMIT 100").all(),
   };
+}
+
+function checkAuthLimit(email: string) {
+  const now = Date.now();
+  db.prepare("DELETE FROM auth_limits WHERE resetAt < ?").run(now);
+  const row = db
+    .prepare("SELECT count FROM auth_limits WHERE email=?")
+    .get(email) as { count: number } | undefined;
+  if (row && row.count >= 10)
+    throw new ApiError(
+      "Too many attempts. Please try again in 15 minutes.",
+      429,
+    );
+  db.prepare(
+    "INSERT INTO auth_limits VALUES(?,1,?) ON CONFLICT(email) DO UPDATE SET count=count+1",
+  ).run(email, now + 900000);
+}
+export async function register(name: string, email: string, password: string) {
+  checkAuthLimit(email);
+  if (db.prepare("SELECT userId FROM credentials WHERE email=?").get(email))
+    throw new ApiError(
+      "This email cannot be registered. Try logging in instead.",
+      409,
+    );
+  const salt = randomBytes(16).toString("hex");
+  const hash = ((await deriveKey(password, salt, 64)) as Buffer).toString(
+    "hex",
+  );
+  const id = randomUUID();
+  transaction(() => {
+    if (db.prepare("SELECT userId FROM credentials WHERE email=?").get(email))
+      throw new ApiError(
+        "This email cannot be registered. Try logging in instead.",
+        409,
+      );
+    db.prepare("INSERT INTO users VALUES(?,?,?,?)").run(
+      id,
+      name,
+      "candidate",
+      JSON.stringify({ ...defaultPreferences, tts: false, setup: true }),
+    );
+    db.prepare("INSERT INTO credentials VALUES(?,?,?,?)").run(
+      id,
+      email,
+      salt,
+      hash,
+    );
+  });
+  return login(id);
+}
+export async function authenticate(email: string, password: string) {
+  checkAuthLimit(email);
+  const row = db
+    .prepare("SELECT userId,salt,hash FROM credentials WHERE email=?")
+    .get(email) as { userId: string; salt: string; hash: string } | undefined;
+  const actual = (await deriveKey(
+    password,
+    row?.salt || "optiexam-dummy-salt",
+    64,
+  )) as Buffer;
+  if (!row || !timingSafeEqual(actual, Buffer.from(row.hash, "hex")))
+    throw new ApiError("Email or password is incorrect.", 401);
+  db.prepare("DELETE FROM auth_limits WHERE email=?").run(email);
+  return login(row.userId);
+}
+export function updateProfile(user: User, name: string): User {
+  db.prepare("UPDATE users SET name=? WHERE id=?").run(name, user.id);
+  return { ...user, name };
 }

@@ -3,7 +3,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  Accessibility,
   ArrowRight,
   BookOpen,
   Check,
@@ -40,6 +39,7 @@ import {
   ErrorNotice,
   speak,
 } from "./shared";
+import { PublicGateway, ProfilePage } from "./accounts";
 import { ExamWorkspace } from "./exam";
 import { AdminWorkspace } from "./admin";
 import {
@@ -69,6 +69,24 @@ export function Workspace() {
       }>("me");
       setUser(data.user);
       if (data.preferences) setPrefs(data.preferences);
+      else {
+        try {
+          const saved = JSON.parse(
+            localStorage.getItem("optiexam-guest-preferences") || "null",
+          );
+          if (
+            saved &&
+            typeof saved.contrast === "boolean" &&
+            [100, 125, 150, 175, 200].includes(saved.scale)
+          )
+            setPrefs({
+              ...defaultPreferences,
+              contrast: saved.contrast,
+              scale: saved.scale,
+              tts: false,
+            });
+        } catch {}
+      }
       setError("");
     } catch (e) {
       setError((e as Error).message);
@@ -135,85 +153,40 @@ export function Workspace() {
         <Loading />
       </main>
     );
-  if (!user)
+  if (!user || path === "/")
     return (
-      <>
-        <a className="skip-link" href="#main">
-          Skip to main content
-        </a>
-        <main id="main" className="login-page">
-          <section className="login-story">
-            <Brand />
-            <div>
-              <span className="eyebrow">ACCESSIBLE EXAMINATIONS</span>
-              <h1 tabIndex={-1}>
-                Your examination
-                <br />
-                workspace.
-              </h1>
-              <p>
-                Assigned exams, practice tests, and results. Set up your
-                preferred reading and navigation controls before you begin.
-              </p>
-              <div className="login-features">
-                <span>
-                  <Keyboard /> Keyboard-first navigation
-                </span>
-                <span>
-                  <Volume2 /> Read-aloud support
-                </span>
-                <span>
-                  <Settings2 /> Your accessibility preferences
-                </span>
-              </div>
-            </div>
-            <p className="login-footer">
-              OptiExam <span>Accessible Examination Platform · DT-13</span>
-            </p>
-          </section>
-          <section className="login-panel">
-            <span className="pill">LOCAL PROTOTYPE</span>
-            <h2>Welcome to OptiExam</h2>
-            <p>
-              Choose a demo workspace to explore the full examination journey.
-            </p>
-            <button
-              className="login-choice"
-              disabled={busy}
-              onClick={() => signIn("candidate-demo")}
-            >
-              <span className="tile-icon">
-                <GraduationCap />
-              </span>
-              <span>
-                <strong>Candidate workspace</strong>
-                <small>Aarav Sharma · Candidate</small>
-              </span>
-              <ArrowRight />
-            </button>
-            <button
-              className="login-choice"
-              disabled={busy}
-              onClick={() => signIn("admin-demo")}
-            >
-              <span className="tile-icon muted">
-                <ShieldCheck />
-              </span>
-              <span>
-                <strong>Administrator workspace</strong>
-                <small>Ananya Rao · Administrator</small>
-              </span>
-              <ArrowRight />
-            </button>
-            <p className="demo-note">
-              <ShieldCheck size={18} />
-              Demo accounts use local sessions. Production sign-in is not
-              connected.
-            </p>
-            {error && <ErrorNotice message={error} retry={load} />}
-          </section>
-        </main>
-      </>
+      <PublicGateway
+        currentUser={user}
+        path={path}
+        prefs={prefs}
+        onPreferences={(p) => {
+          setPrefs(p);
+          try {
+            localStorage.setItem(
+              "optiexam-guest-preferences",
+              JSON.stringify(p),
+            );
+          } catch {}
+        }}
+        onSignedIn={async (u) => {
+          const data = await api<{ preferences: Preferences }>("me");
+          const merged =
+            path === "/signup"
+              ? {
+                  ...data.preferences,
+                  contrast: prefs.contrast,
+                  scale: prefs.scale,
+                }
+              : data.preferences;
+          if (path === "/signup") await api("preferences", "PUT", merged);
+          setUser(u);
+          setPrefs(merged);
+          router.push(u.role === "admin" ? "/admin" : "/dashboard");
+        }}
+        onDemo={signIn}
+        busy={busy}
+        error={error}
+      />
     );
   const isExam = path.startsWith("/exam/");
   const admin = user.role === "admin";
@@ -257,11 +230,19 @@ export function Workspace() {
                   {label}
                 </Link>
               ))}
+              <Link
+                className={path === "/profile" ? "nav-item active" : "nav-item"}
+                href="/profile"
+                aria-current={path === "/profile" ? "page" : undefined}
+              >
+                <Settings2 size={20} />
+                Profile & account
+              </Link>
             </nav>
             <div className="sidebar-bottom">
               <div className="access-card">
-                <Accessibility size={23} />
-                <strong>Made for your way of learning</strong>
+                <Settings2 size={23} />
+                <strong>Reading & navigation</strong>
                 <p>Adjust your workspace at any time.</p>
                 <button onClick={() => setSettings(true)}>
                   Accessibility settings <ArrowRight size={15} />
@@ -280,7 +261,10 @@ export function Workspace() {
                 </span>
                 <span>
                   <strong>{user.name}</strong>
-                  <small>{admin ? "Administrator" : "Candidate"} · Demo</small>
+                  <small>
+                    {admin ? "Administrator" : "Candidate"}
+                    {!user.email ? " · Demo" : ""}
+                  </small>
                 </span>
                 <button
                   aria-label="Sign out"
@@ -306,19 +290,29 @@ export function Workspace() {
               </div>
             )}
             <div className="topbar-actions">
-              <span className="demo-label">Demo workspace</span>
+              <Link href="/profile" className="account-link">
+                {user.name}
+              </Link>
               <button
                 className="button secondary compact"
                 onClick={() => setSettings(true)}
               >
-                <Accessibility size={18} />
+                <Settings2 size={18} />
                 Accessibility
               </button>
             </div>
           </header>
           <main id="main" className={isExam ? "exam-main" : "main-content"}>
             {error && <ErrorNotice message={error} />}
-            {admin ? (
+            {path === "/profile" ? (
+              <ProfilePage
+                user={user}
+                prefs={prefs}
+                onUser={setUser}
+                onPreferences={setPrefs}
+                onSignOut={signOut}
+              />
+            ) : admin ? (
               <AdminWorkspace path={path} />
             ) : path === "/setup" ? (
               <div className="setup">
@@ -423,7 +417,13 @@ export function Workspace() {
 function Brand() {
   return (
     <div className="brand">
-      <img className="brand-symbol" src="/optiexam-symbol.png" alt="OptiExam" width={76} height={76} />
+      <img
+        className="brand-symbol"
+        src="/optiexam-symbol.png"
+        alt="OptiExam"
+        width={76}
+        height={76}
+      />
     </div>
   );
 }
@@ -695,7 +695,7 @@ function ExamCard({
       </div>
       {featured && (
         <div className="exam-card-footer">
-          <Accessibility size={17} />
+          <Settings2 size={17} />
           <span>
             Read-aloud support · Keyboard navigation · Answers saved
             automatically

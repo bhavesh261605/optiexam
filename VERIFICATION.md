@@ -36,3 +36,7 @@ Manual NVDA and braille-display testing remain pending. No tool compatibility ce
 Production build and all 3 scoring/deadline unit tests passed. All 8 browser/integration cases passed against a fresh SQLite database using the production build and Edge. The suite covers keyboard completion, autosave recovery, administration, ownership, deadline submission, access lab, accommodations, feedback, mobile 200% text, high contrast, and axe checks. Visually inspected the refreshed dashboard. Confirmed the existing local database returns Aarav Sharma after the name migration. Manual NVDA testing remains outstanding.
 
 The repository includes a Linux Chromium GitHub Actions workflow; that hosted workflow has not run yet.
+
+## Landing, local accounts and profile
+
+Production build and 3 unit tests passed. The 8 existing browser regressions passed after the new entry flow. Two additional tests passed for account creation, login failures, profile persistence, role isolation, duplicate email rejection, and public forms at 200% text/high contrast. Axe checks cover landing, signup and profile. An inline account link was underlined after automated testing identified reliance on colour. Manual NVDA/user testing remains outstanding.
