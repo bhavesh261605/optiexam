@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test tests/engine.test.ts"
+    "test": "node --experimental-strip-types --test tests/engine.test.ts",
+    "test:components": "vitest run",
+    "lint:a11y": "eslint src/components/VoiceAuth.tsx src/components/ExamControls.tsx src/components/AccessibleContent.tsx src/components/ExamGuard.tsx src/components/AnalyticsDashboard.tsx src/components/AudioPractice.tsx"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
@@ -20,10 +22,20 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.11.0",
     "@playwright/test": "^1.58.0",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
     "@types/node": "^24.0.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
+    "eslint": "^9.39.5",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "jsdom": "^29.1.1",
     "prettier": "^3.9.9",
-    "typescript": "^5.9.3"
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.71.0",
+    "vitest": "^5.0.2"
   }
 }

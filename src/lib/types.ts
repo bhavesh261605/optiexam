@@ -1,6 +1,7 @@
 export type Role = "candidate" | "admin";
 export type User = { id: string; name: string; email?: string; role: Role };
 export type Preferences = {
+  language?: "en" | "hi";
   contrast: boolean;
   scale: number;
   tts: boolean;
@@ -11,6 +12,7 @@ export type Preferences = {
   orientationCompleted?: boolean;
 };
 export const defaultPreferences: Preferences = {
+  language: "en",
   contrast: false,
   scale: 100,
   tts: true,
@@ -56,6 +58,7 @@ export type Attempt = {
   score: number | null;
   maxScore: number;
   submittedAt: number | null;
+  questionSeconds?: Record<string, number>;
   serverNow?: number;
   baseDuration?: number;
   extraMinutes?: number;

@@ -11,3 +11,8 @@ playwright-report/
 *.sqlite-shm
 *.sqlite-wal
 *.log
+.venv/
+__pycache__/
+.pytest_cache/
+coverage/
+.vercel/

@@ -2,7 +2,17 @@
 
 A working local prototype based on the seven supplied PRD, architecture, design, accessibility, database, task, and MVP scope references. Candidates can complete an exam using a keyboard, recover saved answers, and read their results. Administrators can create questions, build exams, assign candidates, and inspect submissions.
 
-## Run locally
+## Team repository and hosting status
+
+Source: https://github.com/bhavesh261605/optiexam. Open https://github.dev/bhavesh261605/optiexam to edit in the browser, or clone the repository and create a feature branch. Collaborators need an invitation with write access to push directly; other contributors can fork and submit a pull request. Never commit `.env.local`, databases, recordings, or model downloads.
+
+The current app requires a persistent Node.js server and SQLite volume. It is **not yet compatible with Vercel serverless storage**. Before a working Vercel deployment, migrate `src/lib/server/store.ts` to a hosted database (including asynchronous callers and transactions) or host the application backend on a persistent server. Do not point SQLite at `/tmp`: accounts and examination results would be temporary and inconsistent across instances.
+
+The optional Python voice authentication/transcription service needs a separate host with persistent encrypted storage and model files. Configure its HTTPS `VOICE_SERVICE_URL` and matching `VOICE_JWT_SECRET`. Sarvam page reading uses the Next server directly and needs only the server-side `SARVAM_API_KEY`. Copy `.env.example` to `.env.local` and fill local values; set production values in hosting environment settings. See `backend/README.md` and `SARVAM_VERIFICATION.md`.
+
+Recent features include English/Hindi interface text, Sarvam page reading, opt-in voice navigation, light/dark themes, and the candidate analytics/action dashboard. Browser speech recognition requires microphone permission and a supported recognition service; network availability can affect it. Keyboard controls remain available.
+
+## Local setup
 
 Requires Node.js 24 or later. This version uses the built-in `node:sqlite` module.
 
@@ -25,7 +35,7 @@ The server binds to `127.0.0.1` by default. Start at the landing page. Create a 
 ## Try the candidate journey
 
 1. Choose **Candidate workspace** for Aarav Sharma.
-2. Save accessibility preferences on first entry.
+2. Explore the candidate dashboard and save accessibility preferences from the toolbar.
 3. Open **General Aptitude Assessment** and read the instructions.
 4. Start the exam, select answers, mark questions, and navigate with buttons or the keyboard.
 5. Wait for **All changes saved** and refresh to confirm recovery.
@@ -97,7 +107,7 @@ The suite covers a keyboard-only candidate journey, save failure and recovery, r
 - Vercel deployment and hosted database configuration. A GitHub Actions workflow checks the source. Local SQLite must be replaced before deploying to ephemeral/serverless hosting.
 - Manual NVDA testing on Windows and usability testing with assistive-technology users. Automated axe and keyboard checks do not establish full WCAG conformance.
 - Accommodation request/approval workflows, scheduled breaks, and availability windows. Candidate-specific extra time is implemented.
-- Image uploads, AI descriptions, speech-to-text, multilingual UI, and additional question types.
+- Image uploads, AI descriptions, and additional question types. English/Hindi UI and optional speech-to-text are implemented; broader language/content coverage remains future work.
 
 The prototype uses custom semantic CSS and Radix dialogs rather than adding Tailwind, charts, or form libraries with no current functional need. Results include text and tables. The requested Next.js/TypeScript application and server-owned exam lifecycle are preserved.
 

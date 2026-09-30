@@ -16,6 +16,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - run: npm run test:components
+      - run: npm run lint:a11y
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - name: Browser regression checks
@@ -26,3 +28,33 @@ jobs:
             sleep 1
           done
           npx playwright test
+  audio-api:
+    runs-on: ubuntu-latest
+    env:
+      AURA_DB_PATH: /tmp/optiexam-audio-ci.sqlite
+      VOICE_DB_PATH: /tmp/optiexam-voice-ci.sqlite
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: python backend/setup.py
+      - run: .venv/bin/python -m pytest backend/tests -q
+      - run: npm run build
+      - name: Verify authenticated service bridge
+        run: |
+          .venv/bin/python -m backend.run > /tmp/optiexam-audio.log 2>&1 &
+          audio_pid=$!
+          npm start -- --port 3100 > /tmp/optiexam-web.log 2>&1 &
+          web_pid=$!
+          trap 'kill "$audio_pid" "$web_pid" 2>/dev/null || true' EXIT
+          for i in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3100/api/me && curl --fail --silent http://127.0.0.1:8001/health; then break; fi
+            sleep 1
+          done
+          node --test tests/voice-bridge.test.mjs

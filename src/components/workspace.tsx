@@ -1,4 +1,6 @@
 "use client";
+import { stopReading } from "@/lib/page-reader";
+import { useLanguage } from "./language";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -40,6 +42,10 @@ import {
   speak,
 } from "./shared";
 import { PublicGateway, ProfilePage } from "./accounts";
+import { CandidateHub } from "./CandidateHub";
+import { LearningNavigation } from "./learning-navigation";
+import { AudioPractice } from "./AudioPractice";
+import { useReadingShortcuts } from "./audio/useReadingShortcuts";
 import { ExamWorkspace } from "./exam";
 import { AdminWorkspace } from "./admin";
 import {
@@ -52,10 +58,12 @@ import {
 } from "./learning";
 
 export function Workspace() {
+  const { t, setLanguage } = useLanguage();
   const path = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [prefs, setPrefs] = useState(defaultPreferences);
+  useReadingShortcuts(prefs.tts);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
   const [settings, setSettings] = useState(false);
@@ -83,6 +91,7 @@ export function Workspace() {
               ...defaultPreferences,
               contrast: saved.contrast,
               scale: saved.scale,
+              language: saved.language === "hi" ? "hi" : "en",
               tts: false,
             });
         } catch {}
@@ -94,6 +103,9 @@ export function Workspace() {
       setLoaded(true);
     }
   }
+  useEffect(() => {
+    if (loaded) setLanguage(prefs.language === "hi" ? "hi" : "en");
+  }, [prefs.language, loaded, setLanguage]);
   useEffect(() => {
     load();
   }, []);
@@ -114,7 +126,7 @@ export function Workspace() {
       heading?.focus();
       document.title = `${heading?.textContent || "Accessible examinations"} · OptiExam`;
     }, 150);
-    window.speechSynthesis?.cancel();
+    stopReading();
     return () => clearTimeout(timer);
   }, [path, user]);
   async function signIn(id: string) {
@@ -127,9 +139,7 @@ export function Workspace() {
       router.push(
         data.user.role === "admin"
           ? "/admin"
-          : me.preferences.setup
-            ? "/dashboard"
-            : "/setup",
+          : "/dashboard",
       );
     } catch (e) {
       setError((e as Error).message);
@@ -147,6 +157,15 @@ export function Workspace() {
       setError((e as Error).message);
     }
   }
+  async function savePreferences(p: Preferences) {
+    if (user) await api("preferences", "PUT", p);
+    else {
+      try {
+        localStorage.setItem("optiexam-guest-preferences", JSON.stringify(p));
+      } catch {}
+    }
+    setPrefs(p);
+  }
   if (!loaded)
     return (
       <main>
@@ -159,15 +178,7 @@ export function Workspace() {
         currentUser={user}
         path={path}
         prefs={prefs}
-        onPreferences={(p) => {
-          setPrefs(p);
-          try {
-            localStorage.setItem(
-              "optiexam-guest-preferences",
-              JSON.stringify(p),
-            );
-          } catch {}
-        }}
+        onPreferences={savePreferences}
         onSignedIn={async (u) => {
           const data = await api<{ preferences: Preferences }>("me");
           const merged =
@@ -176,6 +187,7 @@ export function Workspace() {
                   ...data.preferences,
                   contrast: prefs.contrast,
                   scale: prefs.scale,
+                  language: prefs.language || "en",
                 }
               : data.preferences;
           if (path === "/signup") await api("preferences", "PUT", merged);
@@ -201,6 +213,7 @@ export function Workspace() {
     : ([
         ["/dashboard", "Overview", LayoutDashboard],
         ["/access-lab", "Access lab", Compass],
+        ["/audio-practice", "Audio practice", Volume2],
         ["/exams", "My examinations", FileText],
         ["/practice", "Practice & mock tests", BookOpen],
         ["/results", "My results", Trophy],
@@ -209,16 +222,16 @@ export function Workspace() {
   return (
     <>
       <a className="skip-link" href="#main">
-        Skip to main content
+        {t(" Skip to main content ")}
       </a>
       <div className={isExam ? "app-layout exam-layout" : "app-layout"}>
         {!isExam && (
           <aside className="sidebar">
             <Brand />
             <div className="workspace-label">
-              {admin ? "ADMIN WORKSPACE" : "CANDIDATE WORKSPACE"}
+              {t(admin ? "ADMIN WORKSPACE" : "CANDIDATE WORKSPACE")}
             </div>
-            <nav aria-label="Main navigation">
+            <nav aria-label={t("Main navigation")}>
               {navigation.map(([href, label, Icon]) => (
                 <Link
                   key={href}
@@ -227,7 +240,7 @@ export function Workspace() {
                   aria-current={path === href ? "page" : undefined}
                 >
                   <Icon size={20} />
-                  {label}
+                  {t(label)}
                 </Link>
               ))}
               <Link
@@ -236,38 +249,41 @@ export function Workspace() {
                 aria-current={path === "/profile" ? "page" : undefined}
               >
                 <Settings2 size={20} />
-                Profile & account
+                {t(" Profile & account ")}
               </Link>
             </nav>
             <div className="sidebar-bottom">
               <div className="access-card">
                 <Settings2 size={23} />
-                <strong>Reading & navigation</strong>
-                <p>Adjust your workspace at any time.</p>
+                <strong>{t("Reading & navigation")}</strong>
+                <p>{t("Adjust your workspace at any time.")}</p>
                 <button onClick={() => setSettings(true)}>
-                  Accessibility settings <ArrowRight size={15} />
+                  {t(" Accessibility settings ")}
+                  <ArrowRight size={15} />
                 </button>
               </div>
               <button className="nav-item" onClick={() => setHelp(true)}>
                 <Keyboard size={20} />
-                Keyboard help
+                {t(" Keyboard help ")}
               </button>
               <div className="profile">
                 <span className="avatar">
-                  {user.name
-                    .split(" ")
-                    .map((s) => s[0])
-                    .join("")}
+                  {t(
+                    user.name
+                      .split(" ")
+                      .map((s) => s[0])
+                      .join(""),
+                  )}
                 </span>
                 <span>
-                  <strong>{user.name}</strong>
+                  <strong>{t(user.name)}</strong>
                   <small>
-                    {admin ? "Administrator" : "Candidate"}
-                    {!user.email ? " · Demo" : ""}
+                    {t(admin ? "Administrator" : "Candidate")}
+                    {t(!user.email ? " · Demo" : "")}
                   </small>
                 </span>
                 <button
-                  aria-label="Sign out"
+                  aria-label={t("Sign out")}
                   className="icon-button"
                   onClick={signOut}
                 >
@@ -283,25 +299,33 @@ export function Workspace() {
               <Brand />
             ) : (
               <div className="breadcrumb">
-                Workspace <ChevronRight size={15} />
+                {t(" Workspace ")}
+                <ChevronRight size={15} />
                 <span>
-                  {admin ? "Administration" : "Learning & examinations"}
+                  {t(admin ? "Administration" : "Learning & examinations")}
                 </span>
               </div>
             )}
             <div className="topbar-actions">
               <Link href="/profile" className="account-link">
-                {user.name}
+                {t(user.name)}
               </Link>
               <button
                 className="button secondary compact"
                 onClick={() => setSettings(true)}
               >
                 <Settings2 size={18} />
-                Accessibility
+                {t(" Accessibility ")}
               </button>
             </div>
           </header>
+          {!admin && !isExam && (
+            <LearningNavigation
+              user={user}
+              prefs={prefs}
+              onPreferences={savePreferences}
+            />
+          )}
           <main id="main" className={isExam ? "exam-main" : "main-content"}>
             {error && <ErrorNotice message={error} />}
             {path === "/profile" ? (
@@ -317,11 +341,12 @@ export function Workspace() {
             ) : path === "/setup" ? (
               <div className="setup">
                 <PageHeading
-                  eyebrow="MAKE YOURSELF COMFORTABLE"
-                  title="Your exam, your way"
+                  eyebrow={t("MAKE YOURSELF COMFORTABLE")}
+                  title={t("Your exam, your way")}
                 >
-                  Choose the settings that work for you. You can change them at
-                  any time.
+                  {t(
+                    " Choose the settings that work for you. You can change them at any time. ",
+                  )}
                 </PageHeading>
                 <section className="panel">
                   <PreferencesForm
@@ -334,6 +359,8 @@ export function Workspace() {
                   />
                 </section>
               </div>
+            ) : path === "/audio-practice" ? (
+              <AudioPractice userId={user.id} audioEnabled={prefs.tts} />
             ) : path === "/access-lab" ? (
               <AccessLab prefs={prefs} onSaved={setPrefs} />
             ) : path === "/analytics" ? (
@@ -359,8 +386,8 @@ export function Workspace() {
           </main>
           {!isExam && (
             <footer className="workspace-footer">
-              <span>OptiExam · Accessible Examination & Practice</span>
-              <span>Designed for independent learning</span>
+              <span>{t("OptiExam · Accessible Examination & Practice")}</span>
+              <span>{t("Designed for independent learning")}</span>
             </footer>
           )}
         </div>
@@ -368,8 +395,10 @@ export function Workspace() {
       <Modal
         open={settings}
         onOpenChange={setSettings}
-        title="Accessibility preferences"
-        description="Personalize your workspace. Changes apply after saving."
+        title={t("Accessibility preferences")}
+        description={t(
+          "Personalize your workspace. Changes apply after saving.",
+        )}
       >
         <PreferencesForm
           key={String(settings)}
@@ -384,43 +413,50 @@ export function Workspace() {
       <Modal
         open={help}
         onOpenChange={setHelp}
-        title="Keyboard navigation"
-        description="Every action is available using the keyboard."
+        title={t("Keyboard navigation")}
+        description={t("Every action is available using the keyboard.")}
       >
         <div className="shortcut-list">
           <p>
-            <kbd>Tab</kbd> Move to the next control
+            <kbd>Alt+R</kbd> {t("Start reading (Audio on)")}
           </p>
           <p>
-            <kbd>Shift + Tab</kbd> Move to the previous control
+            <kbd>Alt+S</kbd> {t("Stop reading immediately (Audio on)")}
           </p>
           <p>
-            <kbd>↑</kbd>
-            <kbd>↓</kbd> Choose an answer in a radio group
+            <kbd>{t("Tab")}</kbd> {t(" Move to the next control ")}
           </p>
           <p>
-            <kbd>Enter</kbd> Activate a button or link
+            <kbd>{t("Shift + Tab")}</kbd> {t(" Move to the previous control ")}
           </p>
           <p>
-            <kbd>Esc</kbd> Close a dialog
+            <kbd>{t("↑")}</kbd>
+            <kbd>{t("↓")}</kbd> {t(" Choose an answer in a radio group ")}
+          </p>
+          <p>
+            <kbd>{t("Enter")}</kbd> {t(" Activate a button or link ")}
+          </p>
+          <p>
+            <kbd>{t("Esc")}</kbd> {t(" Close a dialog ")}
           </p>
         </div>
         <p>
-          Optional exam shortcuts: N — next, P — previous, R — read, M — mark
-          for review. Enable these in accessibility preferences. Leave them off
-          when using screen-reader navigation.
+          {t(
+            " Optional exam shortcuts: N — next, P — previous, R — read, M — mark for review. Enable these in accessibility preferences. Leave them off when using screen-reader navigation. ",
+          )}
         </p>
       </Modal>
     </>
   );
 }
 function Brand() {
+  const { t } = useLanguage();
   return (
     <div className="brand">
       <img
         className="brand-symbol"
         src="/optiexam-symbol.png"
-        alt="OptiExam"
+        alt={t("OptiExam")}
         width={76}
         height={76}
       />
@@ -439,13 +475,16 @@ function Dashboard({
   onSettings: () => void;
   prefs: Preferences;
 }) {
+  const { t } = useLanguage();
   const [exams, setExams] = useState<Exam[]>([]);
+  const [hubResults, setHubResults] = useState<Result[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   async function load() {
     try {
-      setExams(await api<Exam[]>("exams"));
+      const [examData, resultData] = await Promise.all([api<Exam[]>("exams"), api<Result[]>("analytics")]);
+      setExams(examData); setHubResults(resultData);
       setError("");
     } catch (e) {
       setError((e as Error).message);
@@ -473,45 +512,58 @@ function Dashboard({
           : "Examinations";
   return (
     <>
-      <PageHeading
-        eyebrow={isHome ? `${user.name} · Candidate` : undefined}
-        title={title}
-      >
-        {isHome
-          ? "Your assigned examinations and practice tests."
-          : path === "/results"
-            ? "Your progress, clearly explained."
-            : path === "/practice"
-              ? "Get familiar with the exam experience and build your confidence."
-              : "Everything you need for your next assessment."}
-      </PageHeading>
+      {isHome ? (
+        <CandidateHub user={user} exams={exams} results={hubResults} />
+      ) : (
+        <PageHeading
+          eyebrow={t(isHome ? `${user.name} · Candidate` : undefined)}
+          title={t(title)}
+        >
+          {t(
+            isHome
+              ? "Your assigned examinations and practice tests."
+              : path === "/results"
+                ? "Your progress, clearly explained."
+                : path === "/practice"
+                  ? "Get familiar with the exam experience and build your confidence."
+                  : "Everything you need for your next assessment.",
+          )}
+        </PageHeading>
+      )}
       {isHome && (
-        <div className="exam-tools" aria-label="Preparation tools">
+        <div className="exam-tools" aria-label={t("Preparation tools")}>
           <span>
-            <Settings2 size={18} /> <strong>Your setup</strong>{" "}
-            {prefs.contrast ? "High contrast" : "Standard contrast"} ·{" "}
-            {prefs.scale}% text
+            <Settings2 size={18} /> <strong>{t("Your setup")}</strong>
+            {t(" ")}
+            {t(prefs.contrast ? "High contrast" : "Standard contrast")}{" "}
+            {t(" ·")}
+            {t(" ")}
+            {t(prefs.scale)}
+            {t("% text ")}
           </span>
           <button className="text-button" onClick={onSettings}>
-            Adjust accessibility
+            {t(" Adjust accessibility ")}
           </button>
           <Link href="/access-lab">
-            Try exam controls <ArrowRight size={16} />
+            {t(" Try exam controls ")}
+            <ArrowRight size={16} />
           </Link>
         </div>
       )}
       {active.length > 0 && path !== "/results" && (
         <section className="resume-banner">
           <div>
-            <span className="pill">IN PROGRESS</span>
-            <h2>{active[0].title}</h2>
+            <span className="pill">{t("IN PROGRESS")}</span>
+            <h2>{t(active[0].title)}</h2>
             <p>
-              Your saved answers are ready. The exam timer continues while you
-              are away.
+              {t(
+                " Your saved answers are ready. The exam timer continues while you are away. ",
+              )}
             </p>
           </div>
           <Link className="button" href={`/exam/${active[0].attempt!.id}`}>
-            Resume exam <ArrowRight size={18} />
+            {t(" Resume exam ")}
+            <ArrowRight size={18} />
           </Link>
         </section>
       )}
@@ -519,20 +571,22 @@ function Dashboard({
         <section className="section">
           <div className="section-heading">
             <h2>
-              Assigned examinations{" "}
-              <span className="count">{assigned.length}</span>
+              {t(" Assigned examinations")}
+              {t(" ")}
+              <span className="count">{t(assigned.length)}</span>
             </h2>
             {isHome && (
               <Link href="/exams">
-                View all <ArrowRight size={16} />
+                {t(" View all ")}
+                <ArrowRight size={16} />
               </Link>
             )}
           </div>
           {assigned.length ? (
             assigned.map((e) => <ExamCard exam={e} key={e.id} featured />)
           ) : (
-            <Empty title="No examinations assigned">
-              New assignments will appear here.
+            <Empty title={t("No examinations assigned")}>
+              {t(" New assignments will appear here. ")}
             </Empty>
           )}
         </section>
@@ -540,26 +594,32 @@ function Dashboard({
       {(isHome || path === "/practice") && (
         <section className="section">
           <div className="section-heading">
-            <h2>Practice & mock tests</h2>
+            <h2>{t("Practice & mock tests")}</h2>
             {isHome && (
               <Link href="/practice">
-                Explore practice <ArrowRight size={16} />
+                {t(" Explore practice ")}
+                <ArrowRight size={16} />
               </Link>
             )}
           </div>
           {path === "/practice" && (
-            <div className="filter-group" aria-label="Filter practice sets">
+            <div
+              className="filter-group"
+              aria-label={t("Filter practice sets")}
+            >
               {["all", "practice", "mock"].map((f) => (
                 <button
                   key={f}
                   aria-pressed={filter === f}
                   onClick={() => setFilter(f)}
                 >
-                  {f === "all"
-                    ? "All sets"
-                    : f === "mock"
-                      ? "Mock tests"
-                      : "Practice sets"}
+                  {t(
+                    f === "all"
+                      ? "All sets"
+                      : f === "mock"
+                        ? "Mock tests"
+                        : "Practice sets",
+                  )}
                 </button>
               ))}
             </div>
@@ -576,10 +636,11 @@ function Dashboard({
       {(isHome || path === "/results") && (
         <section className="section">
           <div className="section-heading">
-            <h2>Recent results</h2>
+            <h2>{t("Recent results")}</h2>
             {isHome && (
               <Link href="/results">
-                All results <ArrowRight size={16} />
+                {t(" All results ")}
+                <ArrowRight size={16} />
               </Link>
             )}
           </div>
@@ -591,28 +652,34 @@ function Dashboard({
                     <Trophy size={22} />
                   </span>
                   <span>
-                    <strong>{e.title}</strong>
+                    <strong>{t(e.title)}</strong>
                     <small>
-                      Completed ·{" "}
-                      {new Date(e.attempt!.submittedAt!).toLocaleDateString(
-                        "en-IN",
-                        { day: "numeric", month: "short", year: "numeric" },
+                      {t(" Completed ·")}
+                      {t(" ")}
+                      {t(
+                        new Date(e.attempt!.submittedAt!).toLocaleDateString(
+                          "en-IN",
+                          { day: "numeric", month: "short", year: "numeric" },
+                        ),
                       )}
                     </small>
                   </span>
                   <strong>
-                    {e.attempt!.score} / {e.attempt!.maxScore}
+                    {t(e.attempt!.score)} {t(" / ")}
+                    {t(e.attempt!.maxScore)}
                   </strong>
                   <Link href={`/results/${e.attempt!.id}`}>
-                    View result <ArrowRight size={16} />
+                    {t(" View result ")}
+                    <ArrowRight size={16} />
                   </Link>
                 </div>
               ))}
             </div>
           ) : (
-            <Empty title="No results yet">
-              Complete an exam or practice set to see your score and topic
-              breakdown here.
+            <Empty title={t("No results yet")}>
+              {t(
+                " Complete an exam or practice set to see your score and topic breakdown here. ",
+              )}
             </Empty>
           )}
         </section>
@@ -627,6 +694,7 @@ function ExamCard({
   exam: Exam;
   featured?: boolean;
 }) {
+  const { t } = useLanguage();
   const done = e.attempt?.status === "evaluated";
   const resume = e.attempt?.status === "in_progress";
   const href = done
@@ -647,49 +715,56 @@ function ExamCard({
           )}
         </span>
         <span className={done ? "pill success" : "pill"}>
-          {done
-            ? "COMPLETED"
-            : e.kind === "assigned"
-              ? "ASSIGNED TO YOU"
-              : e.kind === "mock"
-                ? "MOCK TEST"
-                : "PRACTICE SET"}
+          {t(
+            done
+              ? "COMPLETED"
+              : e.kind === "assigned"
+                ? "ASSIGNED TO YOU"
+                : e.kind === "mock"
+                  ? "MOCK TEST"
+                  : "PRACTICE SET",
+          )}
         </span>
       </div>
       <div className="exam-card-body">
         <div>
-          <h3>{e.title}</h3>
-          <p>{e.description}</p>
+          <h3>{t(e.title)}</h3>
+          <p>{t(e.description)}</p>
           <div className="exam-meta">
             <span>
               <Clock size={16} />
-              {e.duration +
-                Object.values(e.extraMinutes || {}).reduce(
-                  (sum, n) => sum + n,
-                  0,
-                )}{" "}
-              minutes
+              {t(
+                e.duration +
+                  Object.values(e.extraMinutes || {}).reduce(
+                    (sum, n) => sum + n,
+                    0,
+                  ),
+              )}
+              {t(" ")}
+              {t(" minutes ")}
             </span>
             <span>
               <FileText size={16} />
-              {e.questions || e.questionIds.length} questions
+              {t(e.questions || e.questionIds.length)} {t(" questions ")}
             </span>
             {featured && (
               <span>
                 <ShieldCheck size={16} />
-                Single-choice MCQ
+                {t(" Single-choice MCQ ")}
               </span>
             )}
           </div>
         </div>
         <Link className={featured ? "button" : "text-button"} href={href}>
-          {done
-            ? "View result"
-            : resume
-              ? "Resume exam"
-              : featured
-                ? "View instructions"
-                : "Start practice"}
+          {t(
+            done
+              ? "View result"
+              : resume
+                ? "Resume exam"
+                : featured
+                  ? "View instructions"
+                  : "Start practice",
+          )}
           <ArrowRight size={18} />
         </Link>
       </div>
@@ -697,8 +772,9 @@ function ExamCard({
         <div className="exam-card-footer">
           <Settings2 size={17} />
           <span>
-            Read-aloud support · Keyboard navigation · Answers saved
-            automatically
+            {t(
+              " Read-aloud support · Keyboard navigation · Answers saved automatically ",
+            )}
           </span>
         </div>
       )}
@@ -707,6 +783,7 @@ function ExamCard({
 }
 
 function Instructions({ id, prefs }: { id: string; prefs: Preferences }) {
+  const { t } = useLanguage();
   const [exam, setExam] = useState<Exam>();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -736,63 +813,72 @@ function Instructions({ id, prefs }: { id: string; prefs: Preferences }) {
   return (
     <>
       <Link className="back-link" href="/dashboard">
-        ← Back to overview
+        {t(" ← Back to overview ")}
       </Link>
-      <PageHeading eyebrow="BEFORE YOU BEGIN" title={exam.title}>
-        {exam.description}
+      <PageHeading eyebrow={t("BEFORE YOU BEGIN")} title={t(exam.title)}>
+        {t(exam.description)}
       </PageHeading>
       <div className="instructions-grid">
         <section className="panel instructions">
-          <h2>A few things to know</h2>
+          <h2>{t("A few things to know")}</h2>
           <ol>
             <li>
-              <strong>Choose one answer per question.</strong>
+              <strong>{t("Choose one answer per question.")}</strong>
               <p>
-                You can change or clear your answer before submission. There is
-                no negative marking.
+                {t(
+                  " You can change or clear your answer before submission. There is no negative marking. ",
+                )}
               </p>
             </li>
             <li>
-              <strong>Move through the exam your way.</strong>
+              <strong>{t("Move through the exam your way.")}</strong>
               <p>
-                Use Previous, Next, or the question navigator. Mark questions to
-                return to later.
+                {t(
+                  " Use Previous, Next, or the question navigator. Mark questions to return to later. ",
+                )}
               </p>
             </li>
             <li>
-              <strong>Your answers save automatically.</strong>
+              <strong>{t("Your answers save automatically.")}</strong>
               <p>
-                Wait for “All changes saved” before leaving. Refreshing restores
-                confirmed answers.
+                {t(
+                  " Wait for “All changes saved” before leaving. Refreshing restores confirmed answers. ",
+                )}
               </p>
             </li>
             <li>
-              <strong>The timer starts when you begin.</strong>
+              <strong>{t("The timer starts when you begin.")}</strong>
               <p>
-                It continues if you close the page. At the deadline, saved
-                answers are submitted automatically.
+                {t(
+                  " It continues if you close the page. At the deadline, saved answers are submitted automatically. ",
+                )}
               </p>
             </li>
             <li>
-              <strong>Review before submitting.</strong>
-              <p>Check unanswered and marked questions. Submission is final.</p>
+              <strong>{t("Review before submitting.")}</strong>
+              <p>
+                {t(
+                  "Check unanswered and marked questions. Submission is final.",
+                )}
+              </p>
             </li>
           </ol>
-          <h2>Keyboard and audio</h2>
+          <h2>{t("Keyboard and audio")}</h2>
           <Link className="preflight-link" href="/access-lab">
             <Compass size={22} />
             <span>
-              <strong>Try the controls before you start</strong>
+              <strong>{t("Try the controls before you start")}</strong>
               <small>
-                Untimed familiarization · Does not use an exam attempt
+                {t(" Untimed familiarization · Does not use an exam attempt ")}
               </small>
             </span>
             <ArrowRight size={18} />
           </Link>
           <NvdaGuide />
           <p>
-            Tab moves between controls. Arrow keys change the selected answer.
-            All speech features are optional.
+            {t(
+              " Tab moves between controls. Arrow keys change the selected answer. All speech features are optional. ",
+            )}
           </p>
           {prefs.tts && (
             <button
@@ -809,7 +895,7 @@ function Instructions({ id, prefs }: { id: string; prefs: Preferences }) {
               }}
             >
               <Volume2 size={18} />
-              Test audio
+              {t(" Test audio ")}
             </button>
           )}
         </section>
@@ -817,57 +903,67 @@ function Instructions({ id, prefs }: { id: string; prefs: Preferences }) {
           <span className="tile-icon">
             <GraduationCap size={28} />
           </span>
-          <h2>Assessment summary</h2>
+          <h2>{t("Assessment summary")}</h2>
           <dl>
             <div>
-              <dt>Duration</dt>
+              <dt>{t("Duration")}</dt>
               <dd>
-                {exam.duration +
+                {t(
+                  exam.duration +
+                    Object.values(exam.extraMinutes || {}).reduce(
+                      (a, b) => a + b,
+                      0,
+                    ),
+                )}
+                {t(" ")}
+                {t(" minutes ")}
+              </dd>
+            </div>
+            <div>
+              <dt>{t("Approved extra time")}</dt>
+              <dd>
+                {t(
                   Object.values(exam.extraMinutes || {}).reduce(
                     (a, b) => a + b,
                     0,
-                  )}{" "}
-                minutes
+                  ),
+                )}
+                {t(" ")}
+                {t(" minutes ")}
               </dd>
             </div>
             <div>
-              <dt>Approved extra time</dt>
-              <dd>
-                {Object.values(exam.extraMinutes || {}).reduce(
-                  (a, b) => a + b,
-                  0,
-                )}{" "}
-                minutes
-              </dd>
+              <dt>{t("Questions")}</dt>
+              <dd>{t(exam.questionIds.length)}</dd>
             </div>
             <div>
-              <dt>Questions</dt>
-              <dd>{exam.questionIds.length}</dd>
+              <dt>{t("Question type")}</dt>
+              <dd>{t("Single choice")}</dd>
             </div>
             <div>
-              <dt>Question type</dt>
-              <dd>Single choice</dd>
-            </div>
-            <div>
-              <dt>Attempts</dt>
-              <dd>One per assessment</dd>
+              <dt>{t("Attempts")}</dt>
+              <dd>{t("One per assessment")}</dd>
             </div>
           </dl>
           <p>
-            <ShieldCheck size={18} /> Your accessibility settings remain
-            available during the exam.
+            <ShieldCheck size={18} />{" "}
+            {t(
+              " Your accessibility settings remain available during the exam. ",
+            )}
           </p>
           <button className="button full" disabled={busy} onClick={start}>
-            {busy
-              ? "Preparing exam…"
-              : exam.attempt
-                ? "Continue to attempt"
-                : "Start exam"}
+            {t(
+              busy
+                ? "Preparing exam…"
+                : exam.attempt
+                  ? "Continue to attempt"
+                  : "Start exam",
+            )}
             <ArrowRight size={18} />
           </button>
           {error && (
             <p role="alert" className="error">
-              {error}
+              {t(error)}
             </p>
           )}
         </aside>
@@ -878,6 +974,7 @@ function Instructions({ id, prefs }: { id: string; prefs: Preferences }) {
 }
 
 export function ResultPage({ id }: { id: string }) {
+  const { t } = useLanguage();
   const [result, setResult] = useState<Result>();
   const [error, setError] = useState("");
   useEffect(() => {
@@ -889,69 +986,83 @@ export function ResultPage({ id }: { id: string }) {
   return (
     <>
       <Link className="back-link" href="/results">
-        ← Back to results
+        {t(" ← Back to results ")}
       </Link>
-      <PageHeading eyebrow="ASSESSMENT COMPLETE" title="Examination result">
-        {result.title} · Your answers have been submitted successfully.
+      <PageHeading
+        eyebrow={t("ASSESSMENT COMPLETE")}
+        title={t("Examination result")}
+      >
+        {t(result.title)}{" "}
+        {t(" · Your answers have been submitted successfully. ")}
       </PageHeading>
       <div className="result-hero panel">
         <span className="result-trophy">
           <Trophy size={38} />
         </span>
         <div>
-          <span className="eyebrow">YOUR SCORE</span>
+          <span className="eyebrow">{t("YOUR SCORE")}</span>
           <h2>
-            {result.score} <span>/ {result.maxScore}</span>
+            {t(result.score)}{" "}
+            <span>
+              {t("/ ")}
+              {t(result.maxScore)}
+            </span>
           </h2>
           <p>
-            {Math.round(((result.score || 0) / result.maxScore) * 100)}% of
-            available marks earned
+            {t(Math.round(((result.score || 0) / result.maxScore) * 100))}
+            {t("% of available marks earned ")}
           </p>
         </div>
         <div className="result-counts">
           <div>
-            <strong>{result.correct}</strong>
-            <span>Correct</span>
+            <strong>{t(result.correct)}</strong>
+            <span>{t("Correct")}</span>
           </div>
           <div>
-            <strong>{result.incorrect}</strong>
-            <span>Incorrect</span>
+            <strong>{t(result.incorrect)}</strong>
+            <span>{t("Incorrect")}</span>
           </div>
           <div>
-            <strong>{result.unanswered}</strong>
-            <span>Unanswered</span>
+            <strong>{t(result.unanswered)}</strong>
+            <span>{t("Unanswered")}</span>
           </div>
         </div>
       </div>
       <section className="panel section">
-        <h2>Performance by topic</h2>
+        <h2>{t("Performance by topic")}</h2>
         <p className="subheading">
-          Use this breakdown to decide what to practice next.
+          {t(" Use this breakdown to decide what to practice next. ")}
         </p>
         <div className="table-wrap">
           <table>
-            <caption className="sr-only">Correct answers by topic</caption>
+            <caption className="sr-only">
+              {t("Correct answers by topic")}
+            </caption>
             <thead>
               <tr>
-                <th scope="col">Topic</th>
-                <th scope="col">Correct answers</th>
-                <th scope="col">Accuracy</th>
+                <th scope="col">{t("Topic")}</th>
+                <th scope="col">{t("Correct answers")}</th>
+                <th scope="col">{t("Accuracy")}</th>
               </tr>
             </thead>
             <tbody>
-              {result.topics.map((t) => (
-                <tr key={t.topic}>
-                  <th scope="row">{t.topic}</th>
+              {result.topics.map((stats) => (
+                <tr key={stats.topic}>
+                  <th scope="row">{t(stats.topic)}</th>
                   <td>
-                    {t.correct} / {t.total}
+                    {t(stats.correct)} {t(" / ")}
+                    {t(stats.total)}
                   </td>
                   <td>
                     <span className="performance-bar" aria-hidden="true">
                       <span
-                        style={{ width: `${(t.correct / t.total) * 100}%` }}
+                        style={{
+                          width: `${(stats.correct / stats.total) * 100}%`,
+                        }}
                       />
                     </span>
-                    {Math.round((t.correct / t.total) * 100)}%
+                    {t(Math.round((stats.correct / stats.total) * 100))}
+                    {t("% ")}
                   </td>
                 </tr>
               ))}
@@ -963,13 +1074,15 @@ export function ResultPage({ id }: { id: string }) {
       <AccessFeedback result={result} />
       <div className="actions">
         <Link href="/analytics" className="button secondary">
-          Learning insights <ChartNoAxesCombined size={18} />
+          {t(" Learning insights ")}
+          <ChartNoAxesCombined size={18} />
         </Link>
         <Link href="/dashboard" className="button secondary">
-          Back to overview
+          {t(" Back to overview ")}
         </Link>
         <Link href="/practice" className="button">
-          Keep practicing <ArrowRight size={18} />
+          {t(" Keep practicing ")}
+          <ArrowRight size={18} />
         </Link>
       </div>
     </>

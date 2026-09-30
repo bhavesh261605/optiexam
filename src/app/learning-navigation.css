@@ -1,0 +1,179 @@
+/* Reference-inspired navigation, with readable contrast and optional shortcuts. */
+.language-picker {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-right: 8px;
+  font-weight: 650;
+}
+.learning-navigation .language-picker select {
+  min-height: 48px;
+  min-width: 112px;
+  padding: 8px 12px;
+  color: #fff;
+  background: #24252b;
+  border: 1px solid #b8adc9;
+  border-radius: 8px;
+  font: inherit;
+}
+.language-picker select:focus-visible {
+  outline: 3px solid #ffe267;
+  outline-offset: 3px;
+}
+html:lang(hi) body {
+  font-family: "Nirmala UI", "Noto Sans Devanagari", "Segoe UI", sans-serif;
+  line-height: 1.65;
+}
+.learning-navigation {
+  background: #24252b;
+  color: #f8f7ff;
+  padding: 18px clamp(16px, 3vw, 40px) 12px;
+  border-bottom: 2px solid #6d5b89;
+  font-size: 1.0625rem;
+}
+.learning-nav-row,
+.learning-nav-tools,
+.learning-navigation nav {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.learning-nav-row {
+  gap: 18px;
+}
+.learning-navigation nav {
+  flex: 1;
+}
+.learning-navigation button,
+.learning-navigation a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: #dfdfed;
+  background: transparent;
+  font-weight: 650;
+  line-height: 1.5;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.learning-navigation kbd {
+  background: transparent;
+  color: inherit;
+  border: 0;
+  padding: 0;
+  font:
+    600 0.75em/1.5 "Segoe UI",
+    Arial,
+    sans-serif;
+  white-space: nowrap;
+}
+.learning-navigation .exam-picker {
+  border: 1px solid #b9a0d7;
+  border-radius: 30px;
+  background: #37174f;
+  color: #f4e9ff;
+}
+.learning-navigation a[aria-current="page"] {
+  color: #fff;
+  background: #6323c7;
+  text-decoration: underline;
+  text-underline-offset: 6px;
+}
+.learning-nav-tools {
+  margin-top: 12px;
+}
+.learning-nav-tools button {
+  border-color: #797686;
+}
+.learning-navigation .learning-account {
+  color: #241b00;
+  background: #f1cc46;
+  border-color: #f1cc46;
+}
+.learning-navigation a:hover,
+.learning-navigation button:hover {
+  border-color: #f5df81;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.learning-navigation :is(a, button):focus-visible {
+  outline: 3px solid #ffe386;
+  outline-offset: 3px;
+}
+.learning-nav-note {
+  color: #d3d0dd;
+  font-size: 0.875rem;
+  margin: 12px 0 0;
+}
+.learning-nav-status {
+  color: #fff1ae;
+  margin: 8px 0 0;
+}
+.learning-nav-status:empty {
+  margin: 0;
+}
+.exam-picker-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.exam-picker-list li {
+  border-bottom: 1px solid var(--line);
+}
+.exam-picker-list a {
+  display: grid;
+  gap: 5px;
+  padding: 16px 4px;
+  min-height: 48px;
+}
+.exam-picker-list span {
+  color: var(--muted);
+}
+.navigation-key-list > div {
+  display: grid;
+  grid-template-columns: 5rem 1fr;
+  gap: 12px;
+  padding: 8px 0;
+}
+.navigation-key-list dt {
+  font-weight: 700;
+}
+.navigation-key-list dd {
+  margin: 0;
+}
+[data-contrast="high"] .learning-navigation {
+  background: #080d17;
+  border-color: #fff;
+}
+[data-contrast="high"] .learning-navigation a[aria-current="page"] {
+  background: #f5d76b;
+  color: #121722;
+}
+@media (max-width: 600px) {
+  .learning-navigation {
+    padding: 16px;
+  }
+  .learning-navigation nav {
+    flex-basis: 100%;
+  }
+  .learning-navigation nav a {
+    flex: 1 1 40%;
+  }
+  .learning-nav-tools > * {
+    flex: 1 1 40%;
+  }
+  .learning-navigation :is(a, button) {
+    flex-wrap: wrap;
+  }
+  [data-large-text="true"] .learning-navigation nav a,
+  [data-large-text="true"] .learning-nav-tools > * {
+    flex-basis: 100%;
+  }
+}

@@ -1,4 +1,5 @@
 "use client";
+import { useLanguage } from "./language";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
@@ -25,6 +26,7 @@ type Overview = {
   audit: Audit[];
 };
 export function AdminWorkspace({ path }: { path: string }) {
+  const { t } = useLanguage();
   const [data, setData] = useState<Overview>();
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -58,8 +60,8 @@ export function AdminWorkspace({ path }: { path: string }) {
   return (
     <>
       <PageHeading
-        eyebrow="ADMIN WORKSPACE"
-        title={title}
+        eyebrow={t("ADMIN WORKSPACE")}
+        title={t(title)}
         action={
           tab === "questions" ? (
             <button
@@ -69,7 +71,7 @@ export function AdminWorkspace({ path }: { path: string }) {
               }
             >
               <Plus size={18} />
-              New question
+              {t(" New question ")}
             </button>
           ) : tab === "exams" ? (
             <button
@@ -85,23 +87,25 @@ export function AdminWorkspace({ path }: { path: string }) {
               }
             >
               <Plus size={18} />
-              Create exam
+              {t(" Create exam ")}
             </button>
           ) : undefined
         }
       >
-        {tab === "overview"
-          ? "Create accessible assessments and support every candidate."
-          : tab === "questions"
-            ? "Clear questions. Meaningful alternatives. A fair assessment."
-            : tab === "exams"
-              ? "Build assessments, set durations, and assign candidates."
-              : tab === "audit"
-                ? "A record of important actions in this local workspace."
-                : "Scores and submissions from your assigned candidates."}
+        {t(
+          tab === "overview"
+            ? "Create accessible assessments and support every candidate."
+            : tab === "questions"
+              ? "Clear questions. Meaningful alternatives. A fair assessment."
+              : tab === "exams"
+                ? "Build assessments, set durations, and assign candidates."
+                : tab === "audit"
+                  ? "A record of important actions in this local workspace."
+                  : "Scores and submissions from your assigned candidates.",
+        )}
       </PageHeading>
       <div role="status" className="success-message">
-        {status}
+        {t(status)}
       </div>
       {error && <ErrorNotice message={error} retry={load} />}
       {tab === "overview" && (
@@ -109,58 +113,62 @@ export function AdminWorkspace({ path }: { path: string }) {
           <div className="stats-grid">
             <div className="stat">
               <div>
-                <span>Question bank</span>
-                <strong>{data.questions.length}</strong>
-                <small>Single-choice questions</small>
+                <span>{t("Question bank")}</span>
+                <strong>{t(data.questions.length)}</strong>
+                <small>{t("Single-choice questions")}</small>
               </div>
               <BookOpen />
             </div>
             <div className="stat">
               <div>
-                <span>Published exams</span>
+                <span>{t("Published exams")}</span>
                 <strong>
-                  {data.exams.filter((e) => e.status === "published").length}
+                  {t(data.exams.filter((e) => e.status === "published").length)}
                 </strong>
-                <small>Available assessments</small>
+                <small>{t("Available assessments")}</small>
               </div>
               <FileText />
             </div>
             <div className="stat">
               <div>
-                <span>Submitted attempts</span>
-                <strong>{data.results.length}</strong>
-                <small>Ready to review</small>
+                <span>{t("Submitted attempts")}</span>
+                <strong>{t(data.results.length)}</strong>
+                <small>{t("Ready to review")}</small>
               </div>
               <Trophy />
             </div>
           </div>
           <section className="section">
-            <h2>Manage your assessments</h2>
+            <h2>{t("Manage your assessments")}</h2>
             <div className="practice-grid">
               <article className="exam-card">
                 <span className="tile-icon">
                   <BookOpen />
                 </span>
-                <h3>A question bank for everyone</h3>
+                <h3>{t("A question bank for everyone")}</h3>
                 <p>
-                  Write questions with clear answer options and accessible data
-                  descriptions.
+                  {t(
+                    " Write questions with clear answer options and accessible data descriptions. ",
+                  )}
                 </p>
                 <Link className="text-button" href="/admin/questions">
-                  Manage questions <ArrowRight size={18} />
+                  {t(" Manage questions ")}
+                  <ArrowRight size={18} />
                 </Link>
               </article>
               <article className="exam-card">
                 <span className="tile-icon">
                   <Users />
                 </span>
-                <h3>Bring your next exam together</h3>
+                <h3>{t("Bring your next exam together")}</h3>
                 <p>
-                  Choose questions, set the order, and assign the right
-                  candidates.
+                  {t(
+                    " Choose questions, set the order, and assign the right candidates. ",
+                  )}
                 </p>
                 <Link className="text-button" href="/admin/exams">
-                  Manage exams <ArrowRight size={18} />
+                  {t(" Manage exams ")}
+                  <ArrowRight size={18} />
                 </Link>
               </article>
             </div>
@@ -172,24 +180,24 @@ export function AdminWorkspace({ path }: { path: string }) {
           <div className="search-box">
             <Search size={19} />
             <label className="sr-only" htmlFor="question-search">
-              Search questions
+              {t(" Search questions ")}
             </label>
             <input
               id="question-search"
-              placeholder="Search questions or topics"
+              placeholder={t("Search questions or topics")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
           <div className="panel table-wrap">
             <table>
-              <caption className="sr-only">Question bank</caption>
+              <caption className="sr-only">{t("Question bank")}</caption>
               <thead>
                 <tr>
-                  <th scope="col">Question</th>
-                  <th scope="col">Topic</th>
-                  <th scope="col">Marks</th>
-                  <th scope="col">Action</th>
+                  <th scope="col">{t("Question")}</th>
+                  <th scope="col">{t("Topic")}</th>
+                  <th scope="col">{t("Marks")}</th>
+                  <th scope="col">{t("Action")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -204,26 +212,26 @@ export function AdminWorkspace({ path }: { path: string }) {
                       <th scope="row">
                         <span className="question-row">
                           <span className="row-number">
-                            {String(i + 1).padStart(2, "0")}
+                            {t(String(i + 1).padStart(2, "0"))}
                           </span>
-                          {q.prompt}
+                          {t(q.prompt)}
                         </span>
                         {q.alternative && (
                           <small className="alternative-label">
-                            Text alternative included
+                            {t(" Text alternative included ")}
                           </small>
                         )}
                       </th>
-                      <td>{q.topic}</td>
-                      <td>{q.marks}</td>
+                      <td>{t(q.topic)}</td>
+                      <td>{t(q.marks)}</td>
                       <td>
                         <button
                           className="button secondary compact"
-                          aria-label={`Edit question: ${q.prompt}`}
+                          aria-label={t(`Edit question: ${q.prompt}`)}
                           onClick={() => setQuestion(q)}
                         >
                           <Pencil size={15} />
-                          Edit
+                          {t(" Edit ")}
                         </button>
                       </td>
                     </tr>
@@ -235,8 +243,8 @@ export function AdminWorkspace({ path }: { path: string }) {
                 .toLowerCase()
                 .includes(search.toLowerCase()),
             ).length === 0 && (
-              <Empty title="No matching questions">
-                Try another word or topic.
+              <Empty title={t("No matching questions")}>
+                {t(" Try another word or topic. ")}
               </Empty>
             )}
           </div>
@@ -247,22 +255,28 @@ export function AdminWorkspace({ path }: { path: string }) {
           {data.exams.map((e) => (
             <article key={e.id} className="exam-card">
               <div className="section-heading">
-                <h2>{e.title}</h2>
-                <span className="pill">{e.status}</span>
+                <h2>{t(e.title)}</h2>
+                <span className="pill">{t(e.status)}</span>
               </div>
-              <p>{e.description}</p>
+              <p>{t(e.description)}</p>
               <div className="exam-meta">
-                <span>{e.duration} minutes</span>
-                <span>{e.questionIds.length} questions</span>
                 <span>
-                  {e.kind === "assigned"
-                    ? `${e.assigned.length} candidates assigned`
-                    : "Available to all candidates"}
+                  {t(e.duration)} {t(" minutes")}
+                </span>
+                <span>
+                  {t(e.questionIds.length)} {t(" questions")}
+                </span>
+                <span>
+                  {t(
+                    e.kind === "assigned"
+                      ? `${e.assigned.length} candidates assigned`
+                      : "Available to all candidates",
+                  )}
                 </span>
               </div>
               <button className="button secondary" onClick={() => setExam(e)}>
                 <Pencil size={17} />
-                Edit exam & assignments
+                {t(" Edit exam & assignments ")}
               </button>
             </article>
           ))}
@@ -272,42 +286,50 @@ export function AdminWorkspace({ path }: { path: string }) {
         (data.results.length ? (
           <div className="panel table-wrap">
             <table>
-              <caption className="sr-only">Candidate scores</caption>
+              <caption className="sr-only">{t("Candidate scores")}</caption>
               <thead>
                 <tr>
-                  <th scope="col">Candidate</th>
-                  <th scope="col">Exam</th>
-                  <th scope="col">Score</th>
-                  <th scope="col">Submitted</th>
-                  <th scope="col">Access feedback</th>
+                  <th scope="col">{t("Candidate")}</th>
+                  <th scope="col">{t("Exam")}</th>
+                  <th scope="col">{t("Score")}</th>
+                  <th scope="col">{t("Submitted")}</th>
+                  <th scope="col">{t("Access feedback")}</th>
                 </tr>
               </thead>
               <tbody>
                 {data.results.map((a) => (
                   <tr key={a.id}>
                     <th scope="row">
-                      {data.candidates.find((c) => c.id === a.userId)?.name}
+                      {t(data.candidates.find((c) => c.id === a.userId)?.name)}
                     </th>
-                    <td>{a.title}</td>
+                    <td>{t(a.title)}</td>
                     <td>
-                      {a.score} / {a.maxScore}
+                      {t(a.score)} {t(" / ")}
+                      {t(a.maxScore)}
                     </td>
-                    <td>{new Date(a.submittedAt!).toLocaleString("en-IN")}</td>
+                    <td>
+                      {t(new Date(a.submittedAt!).toLocaleString("en-IN"))}
+                    </td>
                     <td>
                       {a.feedback ? (
                         <>
                           <strong>
-                            {a.feedback.navigation === "independent"
-                              ? "Independent"
-                              : a.feedback.navigation === "some-help"
-                                ? "Some help needed"
-                                : "Barrier reported"}
+                            {t(
+                              a.feedback.navigation === "independent"
+                                ? "Independent"
+                                : a.feedback.navigation === "some-help"
+                                  ? "Some help needed"
+                                  : "Barrier reported",
+                            )}
                           </strong>
                           <small className="feedback-detail">
-                            {a.feedback.barriers.length
-                              ? a.feedback.barriers.join(", ")
-                              : "No improvement areas selected"}{" "}
-                            · self-reported
+                            {t(
+                              a.feedback.barriers.length
+                                ? a.feedback.barriers.join(", ")
+                                : "No improvement areas selected",
+                            )}
+                            {t(" ")}
+                            {t(" · self-reported ")}
                           </small>
                         </>
                       ) : (
@@ -320,29 +342,29 @@ export function AdminWorkspace({ path }: { path: string }) {
             </table>
           </div>
         ) : (
-          <Empty title="No submissions yet">
-            Candidate results appear here after an exam is submitted.
+          <Empty title={t("No submissions yet")}>
+            {t(" Candidate results appear here after an exam is submitted. ")}
           </Empty>
         ))}
       {tab === "audit" && (
         <div className="panel table-wrap">
           <table>
-            <caption className="sr-only">Recent audit events</caption>
+            <caption className="sr-only">{t("Recent audit events")}</caption>
             <thead>
               <tr>
-                <th scope="col">Event</th>
-                <th scope="col">Details</th>
-                <th scope="col">Actor</th>
-                <th scope="col">Time</th>
+                <th scope="col">{t("Event")}</th>
+                <th scope="col">{t("Details")}</th>
+                <th scope="col">{t("Actor")}</th>
+                <th scope="col">{t("Time")}</th>
               </tr>
             </thead>
             <tbody>
               {data.audit.map((a) => (
                 <tr key={a.id}>
-                  <th scope="row">{a.event.replaceAll("_", " ")}</th>
-                  <td>{a.detail}</td>
-                  <td>{a.actor}</td>
-                  <td>{new Date(a.at).toLocaleString("en-IN")}</td>
+                  <th scope="row">{t(a.event.replaceAll("_", " "))}</th>
+                  <td>{t(a.detail)}</td>
+                  <td>{t(a.actor)}</td>
+                  <td>{t(new Date(a.at).toLocaleString("en-IN"))}</td>
                 </tr>
               ))}
             </tbody>
@@ -354,8 +376,10 @@ export function AdminWorkspace({ path }: { path: string }) {
         onOpenChange={(v) => {
           if (!v) setQuestion(null);
         }}
-        title={question?.id ? "Edit question" : "Create a question"}
-        description="Single-choice questions need four distinct options and one correct answer."
+        title={t(question?.id ? "Edit question" : "Create a question")}
+        description={t(
+          "Single-choice questions need four distinct options and one correct answer.",
+        )}
       >
         {question && (
           <QuestionEditor
@@ -375,8 +399,10 @@ export function AdminWorkspace({ path }: { path: string }) {
         onOpenChange={(v) => {
           if (!v) setExam(null);
         }}
-        title={exam?.id ? "Edit exam & assignments" : "Create an exam"}
-        description="Choose questions, arrange their order, and assign candidates before publishing."
+        title={t(exam?.id ? "Edit exam & assignments" : "Create an exam")}
+        description={t(
+          "Choose questions, arrange their order, and assign candidates before publishing.",
+        )}
       >
         {exam && (
           <ExamEditor
@@ -400,6 +426,7 @@ function QuestionEditor({
   question: Partial<Question>;
   onSaved: () => void;
 }) {
+  const { t } = useLanguage();
   const [q, setQ] = useState(question);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -421,7 +448,7 @@ function QuestionEditor({
   return (
     <form onSubmit={save} className="editor-form">
       <label>
-        Question text
+        {t(" Question text ")}
         <textarea
           required
           minLength={5}
@@ -433,7 +460,7 @@ function QuestionEditor({
       </label>
       <div className="form-grid">
         <label>
-          Topic
+          {t(" Topic ")}
           <input
             required
             maxLength={100}
@@ -442,7 +469,7 @@ function QuestionEditor({
           />
         </label>
         <label>
-          Marks
+          {t(" Marks ")}
           <input
             required
             type="number"
@@ -454,10 +481,11 @@ function QuestionEditor({
         </label>
       </div>
       <fieldset>
-        <legend>Answer options</legend>
+        <legend>{t("Answer options")}</legend>
         {q.options!.map((o, i) => (
           <label key={i}>
-            Option {String.fromCharCode(65 + i)}
+            {t(" Option ")}
+            {t(String.fromCharCode(65 + i))}
             <input
               required
               maxLength={1000}
@@ -475,20 +503,21 @@ function QuestionEditor({
         ))}
       </fieldset>
       <label>
-        Correct answer
+        {t(" Correct answer ")}
         <select
           value={q.correct}
           onChange={(e) => setQ({ ...q, correct: Number(e.target.value) })}
         >
           {[0, 1, 2, 3].map((i) => (
             <option key={i} value={i}>
-              Option {String.fromCharCode(65 + i)}
+              {t(" Option ")}
+              {t(String.fromCharCode(65 + i))}
             </option>
           ))}
         </select>
       </label>
       <label>
-        Accessible description or data equivalent
+        {t(" Accessible description or data equivalent ")}
         <textarea
           rows={3}
           maxLength={3000}
@@ -497,18 +526,18 @@ function QuestionEditor({
         />
       </label>
       <p className="field-note">
-        Include all information needed to answer any question that refers to a
-        chart or diagram. This prototype supports text alternatives; media
-        upload is not included.
+        {t(
+          " Include all information needed to answer any question that refers to a chart or diagram. This prototype supports text alternatives; media upload is not included. ",
+        )}
       </p>
       {error && (
         <p role="alert" className="error">
-          {error}
+          {t(error)}
         </p>
       )}
       <button className="button" type="submit" disabled={busy}>
         <Check size={18} />
-        {busy ? "Saving…" : "Save question"}
+        {t(busy ? "Saving…" : "Save question")}
       </button>
     </form>
   );
@@ -522,6 +551,7 @@ function ExamEditor({
   data: Overview;
   onSaved: () => void;
 }) {
+  const { t } = useLanguage();
   const [e, setE] = useState(exam);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -548,7 +578,7 @@ function ExamEditor({
   return (
     <form onSubmit={save} className="editor-form">
       <label>
-        Exam title
+        {t(" Exam title ")}
         <input
           required
           minLength={3}
@@ -558,7 +588,7 @@ function ExamEditor({
         />
       </label>
       <label>
-        Description
+        {t(" Description ")}
         <textarea
           maxLength={2000}
           value={e.description || ""}
@@ -567,7 +597,7 @@ function ExamEditor({
       </label>
       <div className="form-grid">
         <label>
-          Duration in minutes
+          {t(" Duration in minutes ")}
           <input
             required
             type="number"
@@ -580,21 +610,21 @@ function ExamEditor({
           />
         </label>
         <label>
-          Type
+          {t(" Type ")}
           <select
             value={e.kind}
             onChange={(event) =>
               setE({ ...e, kind: event.target.value as Exam["kind"] })
             }
           >
-            <option value="assigned">Assigned examination</option>
-            <option value="practice">Practice set</option>
-            <option value="mock">Mock test</option>
+            <option value="assigned">{t("Assigned examination")}</option>
+            <option value="practice">{t("Practice set")}</option>
+            <option value="mock">{t("Mock test")}</option>
           </select>
         </label>
       </div>
       <fieldset>
-        <legend>Choose questions</legend>
+        <legend>{t("Choose questions")}</legend>
         <div className="question-picker">
           {data.questions.map((q) => (
             <label key={q.id} className="inline">
@@ -610,23 +640,25 @@ function ExamEditor({
                   })
                 }
               />
-              {q.prompt}
+              {t(q.prompt)}
             </label>
           ))}
         </div>
       </fieldset>
       {!!e.questionIds!.length && (
         <fieldset>
-          <legend>Question order</legend>
+          <legend>{t("Question order")}</legend>
           <ol className="order-list">
             {e.questionIds!.map((id, i) => (
               <li key={id}>
-                <span>{data.questions.find((q) => q.id === id)?.prompt}</span>
+                <span>
+                  {t(data.questions.find((q) => q.id === id)?.prompt)}
+                </span>
                 <button
                   type="button"
                   className="icon-button"
                   disabled={i === 0}
-                  aria-label={`Move question ${i + 1} up`}
+                  aria-label={t(`Move question ${i + 1} up`)}
                   onClick={() => move(i, -1)}
                 >
                   <ArrowUp size={17} />
@@ -635,7 +667,7 @@ function ExamEditor({
                   type="button"
                   className="icon-button"
                   disabled={i === e.questionIds!.length - 1}
-                  aria-label={`Move question ${i + 1} down`}
+                  aria-label={t(`Move question ${i + 1} down`)}
                   onClick={() => move(i, 1)}
                 >
                   <ArrowDown size={17} />
@@ -647,7 +679,7 @@ function ExamEditor({
       )}
       {e.kind === "assigned" && (
         <fieldset>
-          <legend>Assign candidates</legend>
+          <legend>{t("Assign candidates")}</legend>
           {data.candidates.map((c) => (
             <label className="inline" key={c.id}>
               <input
@@ -662,20 +694,21 @@ function ExamEditor({
                   })
                 }
               />
-              {c.name}
+              {t(c.name)}
             </label>
           ))}
         </fieldset>
       )}
       <fieldset className="accommodation-editor">
-        <legend>Approved extra time</legend>
+        <legend>{t("Approved extra time")}</legend>
         <p className="field-note">
-          Set minutes per candidate after reviewing their request. Changes apply
-          to new attempts only. No diagnosis is stored here.
+          {t(
+            " Set minutes per candidate after reviewing their request. Changes apply to new attempts only. No diagnosis is stored here. ",
+          )}
         </p>
         {data.candidates.map((c) => (
           <label key={c.id}>
-            {c.name} — extra minutes
+            {t(c.name)} {t(" — extra minutes ")}
             <input
               type="number"
               min={0}
@@ -702,31 +735,34 @@ function ExamEditor({
             setE({ ...e, shuffleQuestions: event.target.checked })
           }
         />
-        Randomize question order per attempt
+        {t(" Randomize question order per attempt ")}
       </label>
       <p className="field-note">
-        Each attempt keeps a stable order after starting. Assistive software
-        stays available; focus changes do not trigger misconduct flags.
+        {t(
+          " Each attempt keeps a stable order after starting. Assistive software stays available; focus changes do not trigger misconduct flags. ",
+        )}
       </p>
       <label>
-        Publication status
+        {t(" Publication status ")}
         <select
           value={e.status}
           onChange={(event) =>
             setE({ ...e, status: event.target.value as Exam["status"] })
           }
         >
-          <option value="draft">Draft — hidden from candidates</option>
-          <option value="published">Published — available to candidates</option>
+          <option value="draft">{t("Draft — hidden from candidates")}</option>
+          <option value="published">
+            {t("Published — available to candidates")}
+          </option>
         </select>
       </label>
       {error && (
         <p className="error" role="alert">
-          {error}
+          {t(error)}
         </p>
       )}
       <button className="button" type="submit" disabled={busy}>
-        {busy ? "Saving…" : "Save exam & assignments"}
+        {t(busy ? "Saving…" : "Save exam & assignments")}
         <Check size={18} />
       </button>
     </form>

@@ -285,6 +285,32 @@ export function session(token?: string): User | undefined {
 export function logout(token: string) {
   db.prepare("DELETE FROM sessions WHERE token=?").run(token);
 }
+export function voiceIdentity(identifier: string): string | undefined {
+  const row = db
+    .prepare(
+      "SELECT u.id FROM users u LEFT JOIN credentials c ON c.userId=u.id WHERE u.role='candidate' AND (c.email=? OR u.id=?)",
+    )
+    .get(identifier, identifier) as { id: string } | undefined;
+  return row?.id;
+}
+export function voiceLogin(id: string, jti: string, expires: number) {
+  if (voiceIdentity(id) !== id)
+    throw new ApiError("Voice sign-in failed.", 401);
+  db.exec(
+    "CREATE TABLE IF NOT EXISTS voice_tokens(jti TEXT PRIMARY KEY, expires INTEGER NOT NULL)",
+  );
+  return transaction(() => {
+    db.prepare("DELETE FROM voice_tokens WHERE expires < ?").run(
+      Date.now() / 1000,
+    );
+    if (db.prepare("SELECT jti FROM voice_tokens WHERE jti=?").get(jti))
+      throw new ApiError("Voice sign-in token was already used.", 401);
+    db.prepare("INSERT INTO voice_tokens VALUES(?,?)").run(jti, expires);
+    const result = login(id);
+    audit(id, "VOICE_SIGNED_IN", "Challenge and speaker match accepted");
+    return result;
+  });
+}
 export function preferences(user: User, prefs?: Preferences): Preferences {
   if (prefs)
     db.prepare("UPDATE users SET prefs=? WHERE id=?").run(
@@ -378,6 +404,7 @@ export function start(user: User, examId: string) {
         tts: prefs.tts,
       },
       answerChanges: 0,
+      questionSeconds: {},
       reviewHistory: [],
       status: "in_progress",
       questions: qs,
@@ -424,6 +451,33 @@ export function submit(user: User, id: string) {
     if (a.userId !== user.id)
       throw new ApiError("Only the candidate can submit.", 403);
     return safeAttempt(finish(a));
+  });
+}
+export function recordQuestionTime(
+  user: User,
+  id: string,
+  qid: string,
+  seconds: number,
+) {
+  return transaction(() => {
+    const a = ownedAttempt(user, id);
+    if (a.userId !== user.id)
+      throw new ApiError("Only the candidate can record time.", 403);
+    if (!canWrite(a.status, a.deadline)) return { closed: true };
+    if (!a.questions.some((q) => q.id === qid))
+      throw new ApiError("Question not in this exam.");
+    const times = a.questionSeconds || {};
+    const recorded = Object.values(times).reduce(
+      (sum, value) => sum + value,
+      0,
+    );
+    const remaining = Math.max(0, (Date.now() - a.startedAt) / 1000 - recorded);
+    a.questionSeconds = {
+      ...times,
+      [qid]: (times[qid] || 0) + Math.min(seconds, remaining),
+    };
+    saveAttempt(a);
+    return { saved: true };
   });
 }
 export function result(user: User, id: string) {

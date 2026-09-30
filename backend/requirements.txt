@@ -1,0 +1,7 @@
+fastapi>=0.115,<1
+uvicorn>=0.30,<1
+PyJWT>=2.10,<3
+numpy>=1.26,<3
+python-multipart>=0.0.20,<1
+cryptography>=44,<51
+imageio-ffmpeg>=0.6,<1

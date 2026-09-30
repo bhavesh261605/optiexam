@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import * as store from "@/lib/server/store";
+import { voiceRequest } from "@/lib/server/voice";
+import { sarvamSpeech } from "@/lib/server/sarvam";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const prefsSchema = z.object({
+  language: z.enum(["en", "hi"]).default("en"),
   contrast: z.boolean(),
   scale: z.number().min(100).max(200),
   tts: z.boolean(),
@@ -54,6 +57,8 @@ async function handle(req: NextRequest) {
         );
     }
     const token = req.cookies.get("aura_session")?.value;
+    if (path[0] === "voice" && path.length === 2)
+      return await voiceRequest(req, path[1]);
     if ((path[0] === "register" || path[0] === "signin") && method === "POST") {
       const body = z
         .object({
@@ -119,6 +124,7 @@ async function handle(req: NextRequest) {
         preferences: user ? store.preferences(user) : null,
       });
     if (!user) throw new store.ApiError("Please sign in to continue.", 401);
+    if (path[0] === "tts" && path.length === 1 && method === "POST") return sarvamSpeech(req, user.id);
     let data: unknown;
     if (path[0] === "profile" && method === "PUT")
       data = store.updateProfile(
@@ -163,7 +169,20 @@ async function handle(req: NextRequest) {
             })
             .parse(await req.json()),
         );
-      else if (method === "POST" && path[2] === "submit")
+      else if (method === "POST" && path[2] === "time") {
+        const body = z
+          .object({
+            questionId: z.string(),
+            seconds: z.number().finite().min(0).max(30),
+          })
+          .parse(await req.json());
+        data = store.recordQuestionTime(
+          user,
+          path[1],
+          body.questionId,
+          body.seconds,
+        );
+      } else if (method === "POST" && path[2] === "submit")
         data = store.submit(user, path[1]);
       else if (method === "GET" && path[2] === "result")
         data = store.result(user, path[1]);
@@ -223,4 +242,4 @@ async function handle(req: NextRequest) {
 export const GET = handle;
 export const POST = handle;
 export const PUT = handle;
-
+export const DELETE = handle;

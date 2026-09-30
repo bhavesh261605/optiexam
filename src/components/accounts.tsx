@@ -1,9 +1,13 @@
 "use client";
+import { useLanguage } from "./language";
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ArrowRight, BookOpen, Keyboard, Settings2 } from "lucide-react";
 import { api, PreferencesForm } from "./shared";
 import type { User, Preferences } from "@/lib/types";
+import { LearningNavigation } from "./learning-navigation";
+import { VoiceCommands } from "./VoiceCommands";
+import { VoiceAuth } from "./VoiceAuth";
 
 export function PublicGateway({
   path,
@@ -18,12 +22,13 @@ export function PublicGateway({
   path: string;
   currentUser?: User | null;
   prefs: Preferences;
-  onPreferences: (p: Preferences) => void;
+  onPreferences: (p: Preferences) => Promise<void>;
   onSignedIn: (u: User) => Promise<void>;
   onDemo: (id: string) => Promise<void>;
   busy: boolean;
   error: string;
 }) {
+  const { t } = useLanguage();
   const signup = path === "/signup";
   const landing = path !== "/login" && !signup;
   const [saving, setSaving] = useState(false);
@@ -62,20 +67,20 @@ export function PublicGateway({
   return (
     <div className="public-site">
       <a className="skip-link" href="#main">
-        Skip to main content
+        {t(" Skip to main content ")}
       </a>
       <header className="public-header">
-        <Link href="/" className="public-brand" aria-label="OptiExam home">
-          <img src="/optiexam-symbol.png" alt="" width="52" height="52" />
-          <span>OptiExam</span>
+        <Link href="/" className="public-brand" aria-label={t("OptiExam home")}>
+          <img src="/optiexam-symbol.png" alt={t("")} width="52" height="52" />
+          <span>{t("OptiExam")}</span>
         </Link>
-        <nav aria-label="Account navigation">
+        <nav aria-label={t("Account navigation")}>
           {currentUser ? (
             <Link
               className="button"
               href={currentUser.role === "admin" ? "/admin" : "/dashboard"}
             >
-              Go to dashboard
+              {t(" Go to dashboard ")}
             </Link>
           ) : (
             <>
@@ -83,63 +88,82 @@ export function PublicGateway({
                 href="/login"
                 aria-current={path === "/login" ? "page" : undefined}
               >
-                Log in
+                {t(" Log in ")}
               </Link>
               <Link
                 className="button"
                 href="/signup"
                 aria-current={signup ? "page" : undefined}
               >
-                Create account
+                {t(" Create account ")}
               </Link>
             </>
           )}
         </nav>
       </header>
-      <section className="reading-bar" aria-label="Reading preferences">
-        <span>
-          <Settings2 size={19} aria-hidden="true" /> Reading preferences
-        </span>
-        <label>
-          <input
-            type="checkbox"
-            checked={prefs.contrast}
+      {currentUser?.role === "candidate" && (
+        <LearningNavigation
+          user={currentUser}
+          prefs={prefs}
+          onPreferences={onPreferences}
+        />
+      )}
+      {!landing && (
+        <section className="reading-bar" aria-label={t("Reading preferences")}>
+          <span>
+            <Settings2 size={19} aria-hidden="true" />{" "}
+            {t(" Reading preferences ")}
+          </span>
+          <label>
+            <input
+              type="checkbox"
+              checked={prefs.contrast}
+              onChange={(e) =>
+                onPreferences({ ...prefs, contrast: e.target.checked }).catch(
+                  (e) => setFailure(e.message),
+                )
+              }
+            />
+            {t(" ")}
+            {t(" High contrast ")}
+          </label>
+          <label htmlFor="public-size">{t("Text size")}</label>
+          <select
+            id="public-size"
+            value={prefs.scale}
             onChange={(e) =>
-              onPreferences({ ...prefs, contrast: e.target.checked })
+              onPreferences({ ...prefs, scale: Number(e.target.value) }).catch(
+                (e) => setFailure(e.message),
+              )
             }
-          />{" "}
-          High contrast
-        </label>
-        <label htmlFor="public-size">Text size</label>
-        <select
-          id="public-size"
-          value={prefs.scale}
-          onChange={(e) =>
-            onPreferences({ ...prefs, scale: Number(e.target.value) })
-          }
-        >
-          {[100, 125, 150, 175, 200].map((n) => (
-            <option key={n} value={n}>
-              {n}%
-            </option>
-          ))}
-        </select>
-      </section>
+          >
+            {[100, 125, 150, 175, 200].map((n) => (
+              <option key={n} value={n}>
+                {t(n)}
+                {t("% ")}
+              </option>
+            ))}
+          </select>
+        </section>
+      )}
+      {!landing && !currentUser && <VoiceCommands />}
       <main id="main" className={landing ? "landing-main" : "account-main"}>
         {landing ? (
           <>
             <section className="landing-hero">
               <div>
-                <p className="eyebrow">EXAMINATIONS · PRACTICE · PROGRESS</p>
+                <p className="eyebrow">
+                  {t("EXAMINATIONS · PRACTICE · PROGRESS")}
+                </p>
                 <h1 tabIndex={-1}>
-                  Your next exam.
+                  {t(" Your next exam. ")}
                   <br />
-                  Your way to prepare.
+                  {t(" Your way to prepare. ")}
                 </h1>
                 <p className="hero-description">
-                  A clear, accessible space to practise, take examinations, and
-                  understand your results. Use your keyboard, screen reader, or
-                  the reading settings that suit you.
+                  {t(
+                    " A clear, accessible space to practise, take examinations, and understand your results. Use your keyboard, screen reader, or the reading settings that suit you. ",
+                  )}
                 </p>
                 <div className="hero-actions">
                   {currentUser ? (
@@ -149,39 +173,45 @@ export function PublicGateway({
                         currentUser.role === "admin" ? "/admin" : "/dashboard"
                       }
                     >
-                      Continue to your dashboard <ArrowRight size={20} />
+                      {t(" Continue to your dashboard ")}
+                      <ArrowRight size={20} />
                     </Link>
                   ) : (
                     <>
                       <Link className="button" href="/signup">
-                        Create your account <ArrowRight size={20} />
+                        {t(" Create your account ")}
+                        <ArrowRight size={20} />
                       </Link>
                       <Link className="button secondary" href="/login">
-                        Log in
+                        {t(" Log in ")}
                       </Link>
                     </>
                   )}
                 </div>
                 <p className="quiet-note">
-                  Set up once. Keep your preferences for every visit.
+                  {t(" Set up once. Keep your preferences for every visit. ")}
                 </p>
               </div>
               <aside className="start-guide" aria-labelledby="start-title">
-                <span className="guide-label">GETTING STARTED</span>
-                <h2 id="start-title">From preparation to results</h2>
+                <span className="guide-label">{t("GETTING STARTED")}</span>
+                <h2 id="start-title">{t("From preparation to results")}</h2>
                 <ol>
                   <li>
-                    <strong>Create your account</strong>
-                    <p>Save your profile and reading preferences.</p>
+                    <strong>{t("Create your account")}</strong>
+                    <p>{t("Save your profile and reading preferences.")}</p>
                   </li>
                   <li>
-                    <strong>Get familiar with the controls</strong>
-                    <p>Try the untimed Access Lab before an assessment.</p>
-                  </li>
-                  <li>
-                    <strong>Practise or take an exam</strong>
+                    <strong>{t("Get familiar with the controls")}</strong>
                     <p>
-                      Review answers, submit, and explore your topic results.
+                      {t("Try the untimed Access Lab before an assessment.")}
+                    </p>
+                  </li>
+                  <li>
+                    <strong>{t("Practise or take an exam")}</strong>
+                    <p>
+                      {t(
+                        " Review answers, submit, and explore your topic results. ",
+                      )}
                     </p>
                   </li>
                 </ol>
@@ -191,85 +221,100 @@ export function PublicGateway({
               className="access-principles"
               aria-labelledby="access-title"
             >
-              <h2 id="access-title">Choose how you use OptiExam</h2>
+              <h2 id="access-title">{t("Choose how you use OptiExam")}</h2>
               <div className="principles-grid">
                 <article>
                   <Keyboard aria-hidden="true" />
-                  <h3>Navigate with a keyboard</h3>
+                  <h3>{t("Navigate with a keyboard")}</h3>
                   <p>
-                    Use Tab to move, Enter to activate, and arrow keys to select
-                    answers. Focus stays visible.
+                    {t(
+                      " Use Tab to move, Enter to activate, and arrow keys to select answers. Focus stays visible. ",
+                    )}
                   </p>
                 </article>
                 <article>
                   <Settings2 aria-hidden="true" />
-                  <h3>Make text easier to read</h3>
+                  <h3>{t("Make text easier to read")}</h3>
                   <p>
-                    Increase text size up to 200% and switch to high contrast.
-                    Controls remain labelled and easy to find.
+                    {t(
+                      " Increase text size up to 200% and switch to high contrast. Controls remain labelled and easy to find. ",
+                    )}
                   </p>
                 </article>
                 <article>
                   <BookOpen aria-hidden="true" />
-                  <h3>Use your screen reader</h3>
+                  <h3>{t("Use your screen reader")}</h3>
                   <p>
-                    Headings, form labels, and answer groups support navigation.
-                    Optional read-aloud stays under your control.
+                    {t(
+                      " Headings, form labels, and answer groups support navigation. Optional read-aloud stays under your control. ",
+                    )}
                   </p>
                 </article>
               </div>
             </section>
             <section className="public-help">
-              <h2>Prefer to explore first?</h2>
+              <h2>{t("Prefer to explore first?")}</h2>
               <p>
-                Try the sample candidate workspace without creating an account.
-                Sample activity is shared within this local prototype.
+                {t(
+                  " Try the sample candidate workspace without creating an account. Sample activity is shared within this local prototype. ",
+                )}
               </p>
               <button
                 className="button secondary"
                 onClick={() => onDemo("candidate-demo")}
                 disabled={busy}
               >
-                Candidate workspace <ArrowRight size={18} />
+                {t(" Candidate workspace ")}
+                <ArrowRight size={18} />
               </button>
               <details>
-                <summary>Administrator demo</summary>
+                <summary>{t("Administrator demo")}</summary>
                 <p>
-                  Create sample questions and assign exams. This is a local
-                  development workspace.
+                  {t(
+                    " Create sample questions and assign exams. This is a local development workspace. ",
+                  )}
                 </p>
                 <button
                   className="button secondary"
                   disabled={busy}
                   onClick={() => onDemo("admin-demo")}
                 >
-                  Administrator workspace
+                  {t(" Administrator workspace ")}
                 </button>
               </details>
-              {error && <p role="alert">{error}</p>}
+              {error && <p role="alert">{t(error)}</p>}
             </section>
           </>
         ) : (
           <section className="account-panel" key={path}>
             <Link href="/" className="back-link">
-              ← Back to home
+              {t(" ← Back to home ")}
             </Link>
             <h1 tabIndex={-1}>
-              {signup ? "Create your account" : "Log in to OptiExam"}
+              {t(signup ? "Create your account" : "Log in to OptiExam")}
             </h1>
             <p>
-              {signup
-                ? "Save your preferences, practise, and view your results in one place."
-                : "Continue to your examinations and practice workspace."}
+              {t(
+                signup
+                  ? "Save your preferences, practise, and view your results in one place."
+                  : "Continue to your examinations and practice workspace.",
+              )}
             </p>
+            {!signup && (
+              <details>
+                <summary>{t("Use voice sign-in")}</summary>
+                <VoiceAuth mode="login" />
+              </details>
+            )}
             <p className="form-instructions">
-              All fields are required. You can paste your password or use a
-              password manager.
+              {t(
+                " All fields are required. You can paste your password or use a password manager. ",
+              )}
             </p>
             <form onSubmit={submit} aria-busy={saving}>
               {signup && (
                 <label htmlFor="account-name">
-                  Full name
+                  {t(" Full name ")}
                   <input
                     id="account-name"
                     name="name"
@@ -281,10 +326,11 @@ export function PublicGateway({
                 </label>
               )}
               <label htmlFor="account-email">
-                Email address
+                {t(" Email address ")}
                 <input
                   id="account-email"
                   name="email"
+                  placeholder="username"
                   type="email"
                   autoComplete="username"
                   required
@@ -294,10 +340,11 @@ export function PublicGateway({
                 />
               </label>
               <label htmlFor="account-password">
-                Password
+                {t(" Password ")}
                 <input
                   id="account-password"
                   name="password"
+                  placeholder="password"
                   type={showPassword ? "text" : "password"}
                   autoComplete={signup ? "new-password" : "current-password"}
                   required
@@ -308,9 +355,11 @@ export function PublicGateway({
               </label>
               <div className="password-help">
                 <span id="password-help">
-                  {signup
-                    ? "Use 12–128 characters. A phrase with several words is welcome."
-                    : "Enter the password you chose when signing up."}
+                  {t(
+                    signup
+                      ? "Use 12–128 characters. A phrase with several words is welcome."
+                      : "Enter the password you chose when signing up.",
+                  )}
                 </span>
                 <button
                   type="button"
@@ -318,7 +367,7 @@ export function PublicGateway({
                   aria-pressed={showPassword}
                   onClick={() => setShowPassword(!showPassword)}
                 >
-                  {showPassword ? "Hide password" : "Show password"}
+                  {t(showPassword ? "Hide password" : "Show password")}
                 </button>
               </div>
               {failure && (
@@ -328,7 +377,7 @@ export function PublicGateway({
                   role="alert"
                   tabIndex={-1}
                 >
-                  {failure}
+                  {t(failure)}
                 </div>
               )}
               <button
@@ -336,26 +385,34 @@ export function PublicGateway({
                 disabled={saving}
                 type="submit"
               >
-                {saving ? "Please wait…" : signup ? "Create account" : "Log in"}
+                {t(
+                  saving
+                    ? "Please wait…"
+                    : signup
+                      ? "Create account"
+                      : "Log in",
+                )}
                 <ArrowRight size={19} />
               </button>
             </form>
             <p className="account-switch">
-              {signup ? "Already have an account?" : "New to OptiExam?"}{" "}
+              {t(signup ? "Already have an account?" : "New to OptiExam?")}
+              {t(" ")}
               <Link href={signup ? "/login" : "/signup"}>
-                {signup ? "Log in" : "Create an account"}
+                {t(signup ? "Log in" : "Create an account")}
               </Link>
             </p>
             <p className="quiet-note">
-              Local prototype accounts are saved on this computer. Email
-              verification and password recovery are not available yet.
+              {t(
+                " Local prototype accounts are saved on this computer. Email verification and password recovery are not available yet. ",
+              )}
             </p>
           </section>
         )}
       </main>
       <footer className="public-footer">
-        <span>OptiExam · Accessible examinations</span>
-        <span>Keyboard navigation · Adjustable reading preferences</span>
+        <span>{t("OptiExam · Accessible examinations")}</span>
+        <span>{t("Keyboard navigation · Adjustable reading preferences")}</span>
       </footer>
     </div>
   );
@@ -374,6 +431,7 @@ export function ProfilePage({
   onPreferences: (p: Preferences) => void;
   onSignOut: () => void;
 }) {
+  const { t } = useLanguage();
   const [name, setName] = useState(user.name),
     [message, setMessage] = useState(""),
     [error, setError] = useState(""),
@@ -394,13 +452,13 @@ export function ProfilePage({
   }
   return (
     <div className="profile-page">
-      <h1 tabIndex={-1}>Profile & account</h1>
-      <p>Manage your details and the way you use OptiExam.</p>
+      <h1 tabIndex={-1}>{t("Profile & account")}</h1>
+      <p>{t("Manage your details and the way you use OptiExam.")}</p>
       <section className="panel">
-        <h2>Account details</h2>
+        <h2>{t("Account details")}</h2>
         <form className="profile-form" onSubmit={save}>
           <label htmlFor="profile-name">
-            Full name
+            {t(" Full name ")}
             <input
               id="profile-name"
               autoComplete="name"
@@ -412,32 +470,52 @@ export function ProfilePage({
             />
           </label>
           <dl className="account-details">
-            <dt>Email address</dt>
-            <dd>{user.email || "Demo account · no email address"}</dd>
-            <dt>Account type</dt>
-            <dd>{user.role === "admin" ? "Administrator" : "Candidate"}</dd>
+            <dt>{t("Email address")}</dt>
+            <dd>{t(user.email || "Demo account · no email address")}</dd>
+            <dt>{t("Account type")}</dt>
+            <dd>{t(user.role === "admin" ? "Administrator" : "Candidate")}</dd>
           </dl>
           {error && (
             <p role="alert" className="form-error">
-              {error}
+              {t(error)}
             </p>
           )}
-          <p role="status">{message}</p>
+          <p role="status">{t(message)}</p>
           <button className="button" disabled={busy}>
-            {busy ? "Saving…" : "Save profile"}
+            {t(busy ? "Saving…" : "Save profile")}
           </button>
         </form>
       </section>
       <section className="panel">
-        <h2>Reading & navigation</h2>
-        <p>Your saved preferences apply throughout the workspace.</p>
+        <h2>{t("Reading & navigation")}</h2>
+        <p>{t("Your saved preferences apply throughout the workspace.")}</p>
         <PreferencesForm preferences={prefs} onSaved={onPreferences} />
       </section>
+      {user.role === "candidate" && user.email && (
+        <VoiceAuth mode="enroll" accountId={user.id} />
+      )}
+      {user.role === "candidate" && !user.email && (
+        <section className="panel section">
+          <h2>{t("Voice sign-in")}</h2>
+          <p>
+            {t(
+              " Voice enrollment requires a personal account. Shared demo accounts do not store biometric profiles. ",
+            )}
+          </p>
+          <p>
+            {t("Sign out below, then choose Create account on the home page.")}
+          </p>
+        </section>
+      )}
       <section className="panel">
-        <h2>Sign out of this account</h2>
-        <p>Your saved answers and preferences will be here when you return.</p>
+        <h2>{t("Sign out of this account")}</h2>
+        <p>
+          {t(
+            "Your saved answers and preferences will be here when you return.",
+          )}
+        </p>
         <button className="button secondary" onClick={onSignOut}>
-          Sign out
+          {t(" Sign out ")}
         </button>
       </section>
     </div>
