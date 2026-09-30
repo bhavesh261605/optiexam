@@ -6,9 +6,13 @@ A working local prototype based on the seven supplied PRD, architecture, design,
 
 Source: https://github.com/bhavesh261605/optiexam. Open https://github.dev/bhavesh261605/optiexam to edit in the browser, or clone the repository and create a feature branch. Collaborators need an invitation with write access to push directly; other contributors can fork and submit a pull request. Never commit `.env.local`, databases, recordings, or model downloads.
 
-The current app requires a persistent Node.js server and SQLite volume. It is **not yet compatible with Vercel serverless storage**. Before a working Vercel deployment, migrate `src/lib/server/store.ts` to a hosted database (including asynchronous callers and transactions) or host the application backend on a persistent server. Do not point SQLite at `/tmp`: accounts and examination results would be temporary and inconsistent across instances.
+The web app is deployed at https://optiexam.vercel.app with persistent Neon PostgreSQL storage. Set server-only DATABASE_URL on hosted environments; without it, local development uses SQLite. Hosted storage uses asynchronous queries and transactions to protect concurrent answer saves and repeated submissions. Local accounts/databases are not uploaded automatically.
 
-The optional Python voice authentication/transcription service needs a separate host with persistent encrypted storage and model files. Configure its HTTPS `VOICE_SERVICE_URL` and matching `VOICE_JWT_SECRET`. Sarvam page reading uses the Next server directly and needs only the server-side `SARVAM_API_KEY`. Copy `.env.example` to `.env.local` and fill local values; set production values in hosting environment settings. See `backend/README.md` and `SARVAM_VERIFICATION.md`.
+Sarvam page reading and hosted recorded-audio dictation use server-only SARVAM_API_KEY. Native voice navigation still depends on browser SpeechRecognition support and microphone permission. Recorded dictation displays a provider notice and returns editable text for review.
+
+The optional Python biometric voice service requires a separate model host; it is not deployed on Vercel. Hosted biometric sign-in is explicitly unavailable (NEXT_PUBLIC_VOICE_AUTH_AVAILABLE=false); candidates use password sign-in. To enable it later, configure a private authenticated HTTPS VOICE_SERVICE_URL and matching VOICE_JWT_SECRET, then redeploy with the public availability flag enabled. See backend/README.md.
+
+Public deployment disables shared demo logins, including the administrator demo. Create a personal candidate account. Administrator provisioning must be done by the operator in the database; there is no public role escalation. Browser-local learning drafts and preferences such as theme remain specific to each browser. Exam attempts, results, profile and account accessibility preferences are stored centrally.
 
 Recent features include English/Hindi interface text, Sarvam page reading, opt-in voice navigation, light/dark themes, and the candidate analytics/action dashboard. Browser speech recognition requires microphone permission and a supported recognition service; network availability can affect it. Keyboard controls remain available.
 
@@ -74,7 +78,7 @@ The app creates `data/aura.sqlite` on first run and seeds demo users and exams. 
 
 Server-confirmed answers are authoritative. Unsaved browser answers are retried while the deadline remains valid. If the deadline passes during an outage, only answers received by the server in time count. The open browser submits at expiration; when the page is closed, the server finalizes an expired attempt the next time it is read or written. There is no background job worker in this prototype.
 
-This is a single-server, local demo. Simultaneous editing of the same attempt in multiple tabs has no conflict-resolution UI.
+PostgreSQL uses a transaction-scoped advisory lock for prototype write consistency across server instances. Simultaneous editing of the same answer still uses last-write-wins; there is no conflict-resolution UI.
 
 ## Validation
 
@@ -104,7 +108,7 @@ The suite covers a keyboard-only candidate journey, save failure and recovery, r
 
 - Supabase Auth, PostgreSQL migrations, and Row Level Security. The local store and demo identity are real working substitutes for prototyping, not implementations of Supabase.
 - Email verification, password recovery, production identity operations, administrative provisioning, and deployment-wide abuse protection. Local registration and password sign-in use salted scrypt hashes and a ten-attempt email limit per fifteen-minute window. Anyone with local demo access can select the administrator role by design. Demo login is disabled when `VERCEL` is set.
-- Vercel deployment and hosted database configuration. A GitHub Actions workflow checks the source. Local SQLite must be replaced before deploying to ephemeral/serverless hosting.
+- Hosted PostgreSQL and Vercel deployment are configured. A GitHub Actions workflow checks the source. Email recovery and operational monitoring still need production setup.
 - Manual NVDA testing on Windows and usability testing with assistive-technology users. Automated axe and keyboard checks do not establish full WCAG conformance.
 - Accommodation request/approval workflows, scheduled breaks, and availability windows. Candidate-specific extra time is implemented.
 - Image uploads, AI descriptions, and additional question types. English/Hindi UI and optional speech-to-text are implemented; broader language/content coverage remains future work.
@@ -145,3 +149,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, branches, pull requests, colla
 The public entry routes are `/`, `/login`, and `/signup`. Signed-in candidates reach their dashboard; `/profile` lets each user edit their own name and save reading/navigation preferences. Email is displayed read-only. New accounts are always candidates; administrators can assign exams to registered candidates. The untimed Access Lab and open practice tests are available immediately. Existing demo accounts and exam data remain intact.
 
 Passwords support paste, browser autofill and an explicit show/hide control. Forms have persistent labels, native validation, and focused server-error summaries. High contrast and text-size controls are available before sign-in. Existing users retain saved preferences on login. Local registration is functional, but email ownership is not verified and password recovery is not implemented.
+
+## Hosted verification
+
+`SMOKE_URL=https://optiexam.vercel.app SMOKE_TRANSCRIPTION=1 node tests/hosted-smoke.mjs` checks registration, session persistence, Hindi preferences, authorization, concurrent starts/saves/submissions, results, analytics, Sarvam speech and recorded transcription. It creates a labelled synthetic QA account and retains a result. No real credentials are printed. On PowerShell set the environment variables with `$env:SMOKE_URL` and `$env:SMOKE_TRANSCRIPTION`.

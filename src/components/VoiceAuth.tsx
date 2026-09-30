@@ -93,6 +93,15 @@ export function VoiceAuth({
     : challenge
       ? `Record ${mode === "enroll" ? `sample ${samples.length + 1} of 3` : "sign-in phrase"}`
       : "Get a voice challenge";
+  if (process.env.NEXT_PUBLIC_VOICE_AUTH_AVAILABLE === "false") {
+    return (
+      <p role="status">
+        {language === "hi"
+          ? "वॉइस पहचान से साइन इन अभी इस होस्ट पर उपलब्ध नहीं है। कृपया ईमेल और पासवर्ड से साइन इन करें। वॉइस नेविगेशन और पेज पढ़ना उपलब्ध हैं।"
+          : "Biometric voice sign-in is not available on this host yet. Please use email and password. Voice navigation and page reading remain available."}
+      </p>
+    );
+  }
   return (
     <section
       className="voice-module panel section"

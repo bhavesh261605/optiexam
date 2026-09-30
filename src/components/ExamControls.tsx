@@ -111,6 +111,11 @@ export function ExamControls({
     >
       <h2>{t("Read, dictate and review")}</h2>
       <p>
+        {language === "hi"
+          ? "डिक्टेशन शुरू करने पर रिकॉर्डिंग ट्रांसक्रिप्शन सेवा को भेजी जाती है (होस्टेड ऐप में Sarvam AI)। उत्तर जोड़ने से पहले टेक्स्ट जाँचें।"
+          : "Starting dictation sends your recording to the transcription service (Sarvam AI on the hosted app). Review the text before adding it to your answer."}
+      </p>
+      <p>
         {t(
           "Reading shortcuts: Alt+R starts reading; Alt+S stops immediately. Turn Audio off to disable them. Start is inactive while typing or recording; Stop still works while typing.",
         )}

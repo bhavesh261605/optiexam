@@ -1,7 +1,5 @@
+import { db, transaction } from "./database";
 import { promisify } from "node:util";
-import { DatabaseSync } from "node:sqlite";
-import { mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
 import {
   randomUUID,
   randomBytes,
@@ -19,38 +17,17 @@ import {
   type Preferences,
   type Answer,
 } from "../types";
-
-const dbPath = resolve(
-  /* turbopackIgnore: true */ process.env.AURA_DB_PATH || "./data/aura.sqlite",
-);
-mkdirSync(dirname(dbPath), { recursive: true });
-const globalDb = globalThis as unknown as { auraDb?: DatabaseSync };
-const db = globalDb.auraDb ?? new DatabaseSync(dbPath);
-globalDb.auraDb = db;
-db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
-CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,name TEXT NOT NULL,role TEXT NOT NULL,prefs TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,userId TEXT NOT NULL,expires INTEGER NOT NULL);
-CREATE TABLE IF NOT EXISTS questions(id TEXT PRIMARY KEY,data TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS exams(id TEXT PRIMARY KEY,data TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS attempts(id TEXT PRIMARY KEY,userId TEXT NOT NULL,examId TEXT NOT NULL,data TEXT NOT NULL);
-CREATE UNIQUE INDEX IF NOT EXISTS one_attempt_per_exam ON attempts(userId,examId);
-CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY,actor TEXT NOT NULL,event TEXT NOT NULL,detail TEXT NOT NULL,at INTEGER NOT NULL);`);
-db.exec(`CREATE TABLE IF NOT EXISTS credentials(userId TEXT PRIMARY KEY REFERENCES users(id), email TEXT UNIQUE NOT NULL, salt TEXT NOT NULL, hash TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS auth_limits(email TEXT PRIMARY KEY, count INTEGER NOT NULL, resetAt INTEGER NOT NULL);`);
 const deriveKey = promisify(scrypt);
 const parse = <T>(row: unknown): T | undefined =>
-  row ? (JSON.parse((row as { data: string }).data) as T) : undefined;
-function transaction<T>(fn: () => T): T {
-  db.exec("BEGIN IMMEDIATE");
-  try {
-    const out = fn();
-    db.exec("COMMIT");
-    return out;
-  } catch (error) {
-    db.exec("ROLLBACK");
-    throw error;
-  }
-}
+  row
+    ? (JSON.parse(
+        (
+          row as {
+            data: string;
+          }
+        ).data,
+      ) as T)
+    : undefined;
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -59,25 +36,19 @@ export class ApiError extends Error {
     super(message);
   }
 }
-function audit(actor: string, event: string, detail: string) {
-  db.prepare("INSERT INTO audit(actor,event,detail,at) VALUES(?,?,?,?)").run(
-    actor,
-    event,
-    detail,
-    Date.now(),
-  );
+async function audit(actor: string, event: string, detail: string) {
+  await db
+    .prepare("INSERT INTO audit(actor,event,detail,at) VALUES(?,?,?,?)")
+    .run(actor, event, detail, Date.now());
 }
-function saveAttempt(a: Attempt) {
-  db.prepare("INSERT OR REPLACE INTO attempts VALUES(?,?,?,?)").run(
-    a.id,
-    a.userId,
-    a.examId,
-    JSON.stringify(a),
-  );
+async function saveAttempt(a: Attempt) {
+  await db
+    .prepare("INSERT OR REPLACE INTO attempts VALUES(?,?,?,?)")
+    .run(a.id, a.userId, a.examId, JSON.stringify(a));
 }
-function rawAttempt(id: string) {
+async function rawAttempt(id: string) {
   return parse<Attempt>(
-    db.prepare("SELECT data FROM attempts WHERE id=?").get(id),
+    await db.prepare("SELECT data FROM attempts WHERE id=?").get(id),
   );
 }
 function safeAttempt(a: Attempt): Attempt {
@@ -87,22 +58,22 @@ function safeAttempt(a: Attempt): Attempt {
     questions: a.questions.map(({ correct, ...q }) => q),
   };
 }
-function finish(a: Attempt) {
+async function finish(a: Attempt) {
   if (a.status === "evaluated") return a;
   const score = evaluate(a.questions, a.answers);
   a.status = "evaluated";
   a.score = score.score;
   a.maxScore = score.maxScore;
   a.submittedAt = Date.now();
-  saveAttempt(a);
-  audit(a.userId, "EXAM_SUBMITTED", a.title);
+  await saveAttempt(a);
+  await audit(a.userId, "EXAM_SUBMITTED", a.title);
   return a;
 }
-function ownedAttempt(user: User, id: string) {
-  const a = rawAttempt(id);
+async function ownedAttempt(user: User, id: string) {
+  const a = await rawAttempt(id);
   if (!a || (a.userId !== user.id && user.role !== "admin"))
     throw new ApiError("Attempt not found.", 404);
-  if (a.status === "in_progress" && a.deadline <= Date.now()) finish(a);
+  if (a.status === "in_progress" && a.deadline <= Date.now()) await finish(a);
   return a;
 }
 const seedQuestions: Omit<Question, "id">[] = [
@@ -191,145 +162,175 @@ const seedQuestions: Omit<Question, "id">[] = [
     alternative: "",
   },
 ];
-if (!db.prepare("SELECT id FROM users LIMIT 1").get())
-  transaction(() => {
-    for (const u of [
-      { id: "candidate-demo", name: "Aarav Sharma", role: "candidate" },
-      { id: "candidate-two", name: "Priya Verma", role: "candidate" },
-      { id: "admin-demo", name: "Ananya Rao", role: "admin" },
-    ])
-      db.prepare("INSERT INTO users VALUES(?,?,?,?)").run(
-        u.id,
-        u.name,
-        u.role,
-        JSON.stringify(defaultPreferences),
-      );
-    seedQuestions.forEach((q, i) =>
-      db
-        .prepare("INSERT INTO questions VALUES(?,?)")
-        .run(`q${i + 1}`, JSON.stringify({ ...q, id: `q${i + 1}` })),
-    );
-    for (const e of [
-      {
-        id: "general-aptitude",
-        title: "General Aptitude Assessment",
-        description:
-          "Quantitative aptitude, logical reasoning, and verbal ability.",
-        duration: 20,
-        kind: "assigned",
-        status: "published",
-        questionIds: seedQuestions.map((_, i) => `q${i + 1}`),
-        assigned: ["candidate-demo", "candidate-two"],
-      },
-      {
-        id: "reasoning-practice",
-        title: "Logical Reasoning",
-        description: "Build confidence with patterns and logical conclusions.",
-        duration: 10,
-        kind: "practice",
-        status: "published",
-        questionIds: ["q2", "q5"],
-        assigned: [],
-      },
-      {
-        id: "numerical-mock",
-        title: "Numerical Ability Mock",
-        description:
-          "A short mock test covering numbers and data interpretation.",
-        duration: 12,
-        kind: "mock",
-        status: "published",
-        questionIds: ["q1", "q4", "q7", "q8"],
-        assigned: [],
-      },
-    ])
-      db.prepare("INSERT INTO exams VALUES(?,?)").run(e.id, JSON.stringify(e));
-    audit("admin-demo", "DEMO_INITIALIZED", "Accessible sample exams created");
-  });
-// Rename only the original demo profiles; preserve custom names and saved attempts.
-for (const [id, previous, name] of [
-  ["candidate-demo", "Alex Morgan", "Aarav Sharma"],
-  ["candidate-two", "Sam Taylor", "Priya Verma"],
-  ["admin-demo", "Jordan Lee", "Ananya Rao"],
-]) {
-  db.prepare("UPDATE users SET name=? WHERE id=? AND name=?").run(
-    name,
-    id,
-    previous,
-  );
+let ready: Promise<void> | undefined;
+export async function initializeStore() {
+  return (ready ??= transaction(async () => {
+    await db.exec(`
+CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,name TEXT NOT NULL,role TEXT NOT NULL,prefs TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,userId TEXT NOT NULL,expires INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS questions(id TEXT PRIMARY KEY,data TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS exams(id TEXT PRIMARY KEY,data TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS attempts(id TEXT PRIMARY KEY,userId TEXT NOT NULL,examId TEXT NOT NULL,data TEXT NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS one_attempt_per_exam ON attempts(userId,examId);
+CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY,actor TEXT NOT NULL,event TEXT NOT NULL,detail TEXT NOT NULL,at INTEGER NOT NULL);`);
+    await db.exec(`CREATE TABLE IF NOT EXISTS credentials(userId TEXT PRIMARY KEY REFERENCES users(id), email TEXT UNIQUE NOT NULL, salt TEXT NOT NULL, hash TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS auth_limits(email TEXT PRIMARY KEY, count INTEGER NOT NULL, resetAt INTEGER NOT NULL);`);
+    if (!(await db.prepare("SELECT id FROM users LIMIT 1").get()))
+      await transaction(async () => {
+        for (const u of [
+          { id: "candidate-demo", name: "Aarav Sharma", role: "candidate" },
+          { id: "candidate-two", name: "Priya Verma", role: "candidate" },
+          { id: "admin-demo", name: "Ananya Rao", role: "admin" },
+        ])
+          await db
+            .prepare("INSERT INTO users VALUES(?,?,?,?)")
+            .run(u.id, u.name, u.role, JSON.stringify(defaultPreferences));
+        await Promise.all(
+          seedQuestions.map(
+            async (q, i) =>
+              await db
+                .prepare("INSERT INTO questions VALUES(?,?)")
+                .run(`q${i + 1}`, JSON.stringify({ ...q, id: `q${i + 1}` })),
+          ),
+        );
+        for (const e of [
+          {
+            id: "general-aptitude",
+            title: "General Aptitude Assessment",
+            description:
+              "Quantitative aptitude, logical reasoning, and verbal ability.",
+            duration: 20,
+            kind: "assigned",
+            status: "published",
+            questionIds: seedQuestions.map((_, i) => `q${i + 1}`),
+            assigned: ["candidate-demo", "candidate-two"],
+          },
+          {
+            id: "reasoning-practice",
+            title: "Logical Reasoning",
+            description:
+              "Build confidence with patterns and logical conclusions.",
+            duration: 10,
+            kind: "practice",
+            status: "published",
+            questionIds: ["q2", "q5"],
+            assigned: [],
+          },
+          {
+            id: "numerical-mock",
+            title: "Numerical Ability Mock",
+            description:
+              "A short mock test covering numbers and data interpretation.",
+            duration: 12,
+            kind: "mock",
+            status: "published",
+            questionIds: ["q1", "q4", "q7", "q8"],
+            assigned: [],
+          },
+        ])
+          await db
+            .prepare("INSERT INTO exams VALUES(?,?)")
+            .run(e.id, JSON.stringify(e));
+        await audit(
+          "admin-demo",
+          "DEMO_INITIALIZED",
+          "Accessible sample exams created",
+        );
+      });
+    // Rename only the original demo profiles; preserve custom names and saved attempts.
+    for (const [id, previous, name] of [
+      ["candidate-demo", "Alex Morgan", "Aarav Sharma"],
+      ["candidate-two", "Sam Taylor", "Priya Verma"],
+      ["admin-demo", "Jordan Lee", "Ananya Rao"],
+    ]) {
+      await db
+        .prepare("UPDATE users SET name=? WHERE id=? AND name=?")
+        .run(name, id, previous);
+    }
+  })
+    .then(() => undefined)
+    .catch((error) => {
+      ready = undefined;
+      throw error;
+    }));
 }
-export function login(id: string) {
-  const user = db
+export async function login(id: string) {
+  const user = (await db
     .prepare(
       "SELECT u.id,u.name,u.role,c.email FROM users u LEFT JOIN credentials c ON c.userId=u.id WHERE u.id=?",
     )
-    .get(id) as User | undefined;
+    .get(id)) as User | undefined;
   if (!user) throw new ApiError("Unknown demo account.");
   const token = randomBytes(32).toString("hex");
-  db.prepare("INSERT INTO sessions VALUES(?,?,?)").run(
-    token,
-    id,
-    Date.now() + 86400000,
-  );
-  audit(id, "SIGNED_IN", "Local demo session");
+  await db
+    .prepare("INSERT INTO sessions VALUES(?,?,?)")
+    .run(token, id, Date.now() + 86400000);
+  await audit(id, "SIGNED_IN", "Local demo session");
   return { token, user };
 }
-export function session(token?: string): User | undefined {
+export async function session(token?: string): Promise<User | undefined> {
   if (!token) return;
-  return db
+  return (await db
     .prepare(
       "SELECT u.id,u.name,u.role,c.email FROM users u JOIN sessions s ON s.userId=u.id LEFT JOIN credentials c ON c.userId=u.id WHERE s.token=? AND s.expires>?",
     )
-    .get(token, Date.now()) as User | undefined;
+    .get(token, Date.now())) as User | undefined;
 }
-export function logout(token: string) {
-  db.prepare("DELETE FROM sessions WHERE token=?").run(token);
+export async function logout(token: string) {
+  await db.prepare("DELETE FROM sessions WHERE token=?").run(token);
 }
-export function voiceIdentity(identifier: string): string | undefined {
-  const row = db
+export async function voiceIdentity(
+  identifier: string,
+): Promise<string | undefined> {
+  const row = (await db
     .prepare(
       "SELECT u.id FROM users u LEFT JOIN credentials c ON c.userId=u.id WHERE u.role='candidate' AND (c.email=? OR u.id=?)",
     )
-    .get(identifier, identifier) as { id: string } | undefined;
+    .get(identifier, identifier)) as
+    | {
+        id: string;
+      }
+    | undefined;
   return row?.id;
 }
-export function voiceLogin(id: string, jti: string, expires: number) {
-  if (voiceIdentity(id) !== id)
+export async function voiceLogin(id: string, jti: string, expires: number) {
+  if ((await voiceIdentity(id)) !== id)
     throw new ApiError("Voice sign-in failed.", 401);
-  db.exec(
+  await db.exec(
     "CREATE TABLE IF NOT EXISTS voice_tokens(jti TEXT PRIMARY KEY, expires INTEGER NOT NULL)",
   );
-  return transaction(() => {
-    db.prepare("DELETE FROM voice_tokens WHERE expires < ?").run(
-      Date.now() / 1000,
-    );
-    if (db.prepare("SELECT jti FROM voice_tokens WHERE jti=?").get(jti))
+  return await transaction(async () => {
+    await db
+      .prepare("DELETE FROM voice_tokens WHERE expires < ?")
+      .run(Date.now() / 1000);
+    if (await db.prepare("SELECT jti FROM voice_tokens WHERE jti=?").get(jti))
       throw new ApiError("Voice sign-in token was already used.", 401);
-    db.prepare("INSERT INTO voice_tokens VALUES(?,?)").run(jti, expires);
-    const result = login(id);
-    audit(id, "VOICE_SIGNED_IN", "Challenge and speaker match accepted");
+    await db.prepare("INSERT INTO voice_tokens VALUES(?,?)").run(jti, expires);
+    const result = await login(id);
+    await audit(id, "VOICE_SIGNED_IN", "Challenge and speaker match accepted");
     return result;
   });
 }
-export function preferences(user: User, prefs?: Preferences): Preferences {
+export async function preferences(
+  user: User,
+  prefs?: Preferences,
+): Promise<Preferences> {
   if (prefs)
-    db.prepare("UPDATE users SET prefs=? WHERE id=?").run(
-      JSON.stringify(prefs),
-      user.id,
-    );
+    await db
+      .prepare("UPDATE users SET prefs=? WHERE id=?")
+      .run(JSON.stringify(prefs), user.id);
   return JSON.parse(
     (
-      db.prepare("SELECT prefs FROM users WHERE id=?").get(user.id) as {
+      (await db.prepare("SELECT prefs FROM users WHERE id=?").get(user.id)) as {
         prefs: string;
       }
     ).prefs,
   );
 }
-function allExams() {
-  return db
-    .prepare("SELECT data FROM exams")
-    .all()
-    .map((r) => parse<Exam>(r)!);
+async function allExams() {
+  return (await db.prepare("SELECT data FROM exams").all()).map((r) =>
+    parse<Exam>(r)!,
+  );
 }
 function allowed(user: User, e: Exam) {
   return (
@@ -338,49 +339,53 @@ function allowed(user: User, e: Exam) {
       (e.kind !== "assigned" || e.assigned.includes(user.id)))
   );
 }
-export function exams(user: User) {
-  return allExams()
-    .filter((e) => allowed(user, e))
-    .map((e) => {
-      const a = parse<Attempt>(
-        db
-          .prepare("SELECT data FROM attempts WHERE userId=? AND examId=?")
-          .get(user.id, e.id),
-      );
-      if (a && a.status === "in_progress" && a.deadline <= Date.now())
-        transaction(() => finish(a));
-      return {
-        ...e,
-        assigned: user.role === "admin" ? e.assigned : [],
-        extraMinutes:
-          user.role === "admin"
-            ? e.extraMinutes
-            : { [user.id]: e.extraMinutes?.[user.id] || 0 },
-        questions: e.questionIds.length,
-        attempt: a ? safeAttempt(a) : undefined,
-      };
-    });
+async function examsInTransaction(user: User) {
+  return await Promise.all(
+    (await allExams())
+      .filter((e) => allowed(user, e))
+      .map(async (e) => {
+        const a = parse<Attempt>(
+          await db
+            .prepare("SELECT data FROM attempts WHERE userId=? AND examId=?")
+            .get(user.id, e.id),
+        );
+        if (a && a.status === "in_progress" && a.deadline <= Date.now())
+          await transaction(async () => await finish(a));
+        return {
+          ...e,
+          assigned: user.role === "admin" ? e.assigned : [],
+          extraMinutes:
+            user.role === "admin"
+              ? e.extraMinutes
+              : { [user.id]: e.extraMinutes?.[user.id] || 0 },
+          questions: e.questionIds.length,
+          attempt: a ? safeAttempt(a) : undefined,
+        };
+      }),
+  );
 }
-export function start(user: User, examId: string) {
-  return transaction(() => {
+export async function start(user: User, examId: string) {
+  return await transaction(async () => {
     const e = parse<Exam>(
-      db.prepare("SELECT data FROM exams WHERE id=?").get(examId),
+      await db.prepare("SELECT data FROM exams WHERE id=?").get(examId),
     );
     if (!e || !allowed(user, e)) throw new ApiError("Exam not available.", 404);
     const existing = parse<Attempt>(
-      db
+      await db
         .prepare("SELECT data FROM attempts WHERE userId=? AND examId=?")
         .get(user.id, e.id),
     );
     if (existing) {
       if (existing.status === "in_progress" && existing.deadline <= Date.now())
-        finish(existing);
+        await finish(existing);
       return safeAttempt(existing);
     }
-    const qs = e.questionIds.map((id) =>
-      parse<Question>(
-        db.prepare("SELECT data FROM questions WHERE id=?").get(id),
-      )!,
+    const qs = await Promise.all(
+      e.questionIds.map(async (id) =>
+        parse<Question>(
+          await db.prepare("SELECT data FROM questions WHERE id=?").get(id),
+        )!,
+      ),
     );
     if (e.shuffleQuestions)
       for (let i = qs.length - 1; i > 0; i--) {
@@ -388,7 +393,7 @@ export function start(user: User, examId: string) {
         [qs[i], qs[j]] = [qs[j], qs[i]];
       }
     const extraMinutes = e.extraMinutes?.[user.id] || 0;
-    const prefs = preferences(user);
+    const prefs = await preferences(user);
     const a: Attempt = {
       id: randomUUID(),
       examId,
@@ -413,17 +418,24 @@ export function start(user: User, examId: string) {
       maxScore: qs.reduce((s, q) => s + q.marks, 0),
       submittedAt: null,
     };
-    saveAttempt(a);
-    audit(user.id, "EXAM_STARTED", e.title);
+    await saveAttempt(a);
+    await audit(user.id, "EXAM_STARTED", e.title);
     return safeAttempt(a);
   });
 }
-export function attempt(user: User, id: string) {
-  return transaction(() => safeAttempt(ownedAttempt(user, id)));
+export async function attempt(user: User, id: string) {
+  return await transaction(async () =>
+    safeAttempt(await ownedAttempt(user, id)),
+  );
 }
-export function respond(user: User, id: string, qid: string, answer: Answer) {
-  return transaction(() => {
-    const a = ownedAttempt(user, id);
+export async function respond(
+  user: User,
+  id: string,
+  qid: string,
+  answer: Answer,
+) {
+  return await transaction(async () => {
+    const a = await ownedAttempt(user, id);
     if (a.userId !== user.id)
       throw new ApiError("Only the candidate can answer.", 403);
     if (!canWrite(a.status, a.deadline))
@@ -441,26 +453,26 @@ export function respond(user: User, id: string, qid: string, answer: Answer) {
     if (answer.review && !a.reviewHistory?.includes(qid))
       a.reviewHistory = [...(a.reviewHistory || []), qid];
     a.answers[qid] = answer;
-    saveAttempt(a);
+    await saveAttempt(a);
     return { savedAt: Date.now() };
   });
 }
-export function submit(user: User, id: string) {
-  return transaction(() => {
-    const a = ownedAttempt(user, id);
+export async function submit(user: User, id: string) {
+  return await transaction(async () => {
+    const a = await ownedAttempt(user, id);
     if (a.userId !== user.id)
       throw new ApiError("Only the candidate can submit.", 403);
-    return safeAttempt(finish(a));
+    return safeAttempt(await finish(a));
   });
 }
-export function recordQuestionTime(
+export async function recordQuestionTime(
   user: User,
   id: string,
   qid: string,
   seconds: number,
 ) {
-  return transaction(() => {
-    const a = ownedAttempt(user, id);
+  return await transaction(async () => {
+    const a = await ownedAttempt(user, id);
     if (a.userId !== user.id)
       throw new ApiError("Only the candidate can record time.", 403);
     if (!canWrite(a.status, a.deadline)) return { closed: true };
@@ -476,38 +488,36 @@ export function recordQuestionTime(
       ...times,
       [qid]: (times[qid] || 0) + Math.min(seconds, remaining),
     };
-    saveAttempt(a);
+    await saveAttempt(a);
     return { saved: true };
   });
 }
-export function result(user: User, id: string) {
-  return transaction(() => {
-    const a = ownedAttempt(user, id);
+export async function result(user: User, id: string) {
+  return await transaction(async () => {
+    const a = await ownedAttempt(user, id);
     if (a.status !== "evaluated")
       throw new ApiError("Submit your exam to see the result.", 409);
     return { ...safeAttempt(a), ...evaluate(a.questions, a.answers) };
   });
 }
-export function questions() {
-  return db
-    .prepare("SELECT data FROM questions")
-    .all()
-    .map((r) => parse<Question>(r)!);
+export async function questions() {
+  return (await db.prepare("SELECT data FROM questions").all()).map((r) =>
+    parse<Question>(r)!,
+  );
 }
-export function analytics(user: User) {
-  const records = db
-    .prepare("SELECT data FROM attempts WHERE userId=?")
-    .all(user.id)
-    .map((r) => parse<Attempt>(r)!);
+async function analyticsInTransaction(user: User) {
+  const records = (
+    await db.prepare("SELECT data FROM attempts WHERE userId=?").all(user.id)
+  ).map((r) => parse<Attempt>(r)!);
   for (const a of records)
     if (a.status === "in_progress" && a.deadline <= Date.now())
-      transaction(() => finish(a));
+      await transaction(async () => await finish(a));
   return records
     .filter((a) => a.status === "evaluated")
     .sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0))
     .map((a) => ({ ...safeAttempt(a), ...evaluate(a.questions, a.answers) }));
 }
-export function feedback(
+export async function feedback(
   user: User,
   id: string,
   value: {
@@ -515,8 +525,8 @@ export function feedback(
     barriers: string[];
   },
 ) {
-  return transaction(() => {
-    const a = ownedAttempt(user, id);
+  return await transaction(async () => {
+    const a = await ownedAttempt(user, id);
     if (a.userId !== user.id)
       throw new ApiError("Only the candidate can share their experience.", 403);
     if (a.status !== "evaluated")
@@ -529,88 +539,98 @@ export function feedback(
       barriers: [...new Set(value.barriers)],
       savedAt: Date.now(),
     };
-    saveAttempt(a);
-    audit(user.id, "ACCESS_FEEDBACK_SAVED", a.title);
+    await saveAttempt(a);
+    await audit(user.id, "ACCESS_FEEDBACK_SAVED", a.title);
     return a.feedback;
   });
 }
-export function putQuestion(
+export async function putQuestion(
   user: User,
-  q: Omit<Question, "id"> & { id?: string },
+  q: Omit<Question, "id"> & {
+    id?: string;
+  },
 ) {
   const question = { ...q, id: q.id || randomUUID() };
-  db.prepare("INSERT OR REPLACE INTO questions VALUES(?,?)").run(
-    question.id,
-    JSON.stringify(question),
-  );
-  audit(user.id, "QUESTION_SAVED", question.prompt.slice(0, 100));
+  await db
+    .prepare("INSERT OR REPLACE INTO questions VALUES(?,?)")
+    .run(question.id, JSON.stringify(question));
+  await audit(user.id, "QUESTION_SAVED", question.prompt.slice(0, 100));
   return question;
 }
-export function putExam(user: User, e: Omit<Exam, "id"> & { id?: string }) {
-  if (
-    e.questionIds.some(
-      (id) => !db.prepare("SELECT id FROM questions WHERE id=?").get(id),
-    )
-  )
-    throw new ApiError("One or more questions are unavailable.");
+export async function putExam(
+  user: User,
+  e: Omit<Exam, "id"> & {
+    id?: string;
+  },
+) {
+  for (const id of e.questionIds) {
+    if (!(await db.prepare("SELECT id FROM questions WHERE id=?").get(id)))
+      throw new ApiError("One or more questions are unavailable.");
+  }
   if (new Set(e.questionIds).size !== e.questionIds.length)
     throw new ApiError("Questions must be unique.");
-  if (
-    e.assigned.some(
-      (id) =>
-        !db
-          .prepare("SELECT id FROM users WHERE id=? AND role='candidate'")
-          .get(id),
+  for (const id of e.assigned) {
+    if (
+      !(await db
+        .prepare("SELECT id FROM users WHERE id=? AND role='candidate'")
+        .get(id))
     )
-  )
-    throw new ApiError("Choose existing candidate accounts.");
+      throw new ApiError("Choose existing candidate accounts.");
+  }
   if (Object.keys(e.extraMinutes || {}).some((id) => !e.assigned.includes(id)))
     throw new ApiError("Extra time must belong to an assigned candidate.");
   const exam = { ...e, id: e.id || randomUUID() };
-  db.prepare("INSERT OR REPLACE INTO exams VALUES(?,?)").run(
-    exam.id,
-    JSON.stringify(exam),
-  );
-  audit(user.id, "EXAM_SAVED", exam.title);
+  await db
+    .prepare("INSERT OR REPLACE INTO exams VALUES(?,?)")
+    .run(exam.id, JSON.stringify(exam));
+  await audit(user.id, "EXAM_SAVED", exam.title);
   return exam;
 }
-export function adminOverview() {
-  const attempts = db
-    .prepare("SELECT data FROM attempts")
-    .all()
-    .map((r) => parse<Attempt>(r)!);
+async function adminOverviewInTransaction() {
+  const attempts = (await db.prepare("SELECT data FROM attempts").all()).map(
+    (r) => parse<Attempt>(r)!,
+  );
   for (const a of attempts)
     if (a.status === "in_progress" && a.deadline <= Date.now())
-      transaction(() => finish(a));
+      await transaction(async () => await finish(a));
   return {
-    questions: questions(),
-    exams: allExams(),
-    candidates: db
+    questions: await questions(),
+    exams: await allExams(),
+    candidates: await db
       .prepare("SELECT id,name,role FROM users WHERE role='candidate'")
       .all(),
     results: attempts.filter((a) => a.status === "evaluated").map(safeAttempt),
-    audit: db.prepare("SELECT * FROM audit ORDER BY id DESC LIMIT 100").all(),
+    audit: await db
+      .prepare("SELECT * FROM audit ORDER BY id DESC LIMIT 100")
+      .all(),
   };
 }
-
-function checkAuthLimit(email: string) {
+async function checkAuthLimitInTransaction(email: string) {
   const now = Date.now();
-  db.prepare("DELETE FROM auth_limits WHERE resetAt < ?").run(now);
-  const row = db
+  await db.prepare("DELETE FROM auth_limits WHERE resetAt < ?").run(now);
+  const row = (await db
     .prepare("SELECT count FROM auth_limits WHERE email=?")
-    .get(email) as { count: number } | undefined;
+    .get(email)) as
+    | {
+        count: number;
+      }
+    | undefined;
   if (row && row.count >= 10)
     throw new ApiError(
       "Too many attempts. Please try again in 15 minutes.",
       429,
     );
-  db.prepare(
-    "INSERT INTO auth_limits VALUES(?,1,?) ON CONFLICT(email) DO UPDATE SET count=count+1",
-  ).run(email, now + 900000);
+  await db
+    .prepare(
+      "INSERT INTO auth_limits VALUES(?,1,?) ON CONFLICT(email) DO UPDATE SET count=count+1",
+    )
+    .run(email, now + 900000);
 }
 export async function register(name: string, email: string, password: string) {
-  checkAuthLimit(email);
-  if (db.prepare("SELECT userId FROM credentials WHERE email=?").get(email))
+  await checkAuthLimit(email);
+  if (
+    await db.prepare("SELECT userId FROM credentials WHERE email=?").get(email)
+  )
     throw new ApiError(
       "This email cannot be registered. Try logging in instead.",
       409,
@@ -620,32 +640,41 @@ export async function register(name: string, email: string, password: string) {
     "hex",
   );
   const id = randomUUID();
-  transaction(() => {
-    if (db.prepare("SELECT userId FROM credentials WHERE email=?").get(email))
+  await transaction(async () => {
+    if (
+      await db
+        .prepare("SELECT userId FROM credentials WHERE email=?")
+        .get(email)
+    )
       throw new ApiError(
         "This email cannot be registered. Try logging in instead.",
         409,
       );
-    db.prepare("INSERT INTO users VALUES(?,?,?,?)").run(
-      id,
-      name,
-      "candidate",
-      JSON.stringify({ ...defaultPreferences, tts: false, setup: true }),
-    );
-    db.prepare("INSERT INTO credentials VALUES(?,?,?,?)").run(
-      id,
-      email,
-      salt,
-      hash,
-    );
+    await db
+      .prepare("INSERT INTO users VALUES(?,?,?,?)")
+      .run(
+        id,
+        name,
+        "candidate",
+        JSON.stringify({ ...defaultPreferences, tts: false, setup: true }),
+      );
+    await db
+      .prepare("INSERT INTO credentials VALUES(?,?,?,?)")
+      .run(id, email, salt, hash);
   });
-  return login(id);
+  return await login(id);
 }
 export async function authenticate(email: string, password: string) {
-  checkAuthLimit(email);
-  const row = db
+  await checkAuthLimit(email);
+  const row = (await db
     .prepare("SELECT userId,salt,hash FROM credentials WHERE email=?")
-    .get(email) as { userId: string; salt: string; hash: string } | undefined;
+    .get(email)) as
+    | {
+        userId: string;
+        salt: string;
+        hash: string;
+      }
+    | undefined;
   const actual = (await deriveKey(
     password,
     row?.salt || "optiexam-dummy-salt",
@@ -653,10 +682,26 @@ export async function authenticate(email: string, password: string) {
   )) as Buffer;
   if (!row || !timingSafeEqual(actual, Buffer.from(row.hash, "hex")))
     throw new ApiError("Email or password is incorrect.", 401);
-  db.prepare("DELETE FROM auth_limits WHERE email=?").run(email);
-  return login(row.userId);
+  await db.prepare("DELETE FROM auth_limits WHERE email=?").run(email);
+  return await login(row.userId);
 }
-export function updateProfile(user: User, name: string): User {
-  db.prepare("UPDATE users SET name=? WHERE id=?").run(name, user.id);
+export async function updateProfile(user: User, name: string): Promise<User> {
+  await db.prepare("UPDATE users SET name=? WHERE id=?").run(name, user.id);
   return { ...user, name };
+}
+
+export async function exams(user: User) {
+  return transaction(() => examsInTransaction(user));
+}
+
+export async function analytics(user: User) {
+  return transaction(() => analyticsInTransaction(user));
+}
+
+export async function adminOverview() {
+  return transaction(() => adminOverviewInTransaction());
+}
+
+async function checkAuthLimit(email: string) {
+  return transaction(() => checkAuthLimitInTransaction(email));
 }

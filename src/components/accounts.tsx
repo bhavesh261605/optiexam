@@ -252,38 +252,40 @@ export function PublicGateway({
                 </article>
               </div>
             </section>
-            <section className="public-help">
-              <h2>{t("Prefer to explore first?")}</h2>
-              <p>
-                {t(
-                  " Try the sample candidate workspace without creating an account. Sample activity is shared within this local prototype. ",
-                )}
-              </p>
-              <button
-                className="button secondary"
-                onClick={() => onDemo("candidate-demo")}
-                disabled={busy}
-              >
-                {t(" Candidate workspace ")}
-                <ArrowRight size={18} />
-              </button>
-              <details>
-                <summary>{t("Administrator demo")}</summary>
+            {process.env.NEXT_PUBLIC_HOSTED !== "true" && (
+              <section className="public-help">
+                <h2>{t("Prefer to explore first?")}</h2>
                 <p>
                   {t(
-                    " Create sample questions and assign exams. This is a local development workspace. ",
+                    " Try the sample candidate workspace without creating an account. Sample activity is shared within this local prototype. ",
                   )}
                 </p>
                 <button
                   className="button secondary"
+                  onClick={() => onDemo("candidate-demo")}
                   disabled={busy}
-                  onClick={() => onDemo("admin-demo")}
                 >
-                  {t(" Administrator workspace ")}
+                  {t(" Candidate workspace ")}
+                  <ArrowRight size={18} />
                 </button>
-              </details>
-              {error && <p role="alert">{t(error)}</p>}
-            </section>
+                <details>
+                  <summary>{t("Administrator demo")}</summary>
+                  <p>
+                    {t(
+                      " Create sample questions and assign exams. This is a local development workspace. ",
+                    )}
+                  </p>
+                  <button
+                    className="button secondary"
+                    disabled={busy}
+                    onClick={() => onDemo("admin-demo")}
+                  >
+                    {t(" Administrator workspace ")}
+                  </button>
+                </details>
+                {error && <p role="alert">{t(error)}</p>}
+              </section>
+            )}
           </>
         ) : (
           <section className="account-panel" key={path}>
@@ -404,7 +406,9 @@ export function PublicGateway({
             </p>
             <p className="quiet-note">
               {t(
-                " Local prototype accounts are saved on this computer. Email verification and password recovery are not available yet. ",
+                process.env.NEXT_PUBLIC_HOSTED === "true"
+                  ? "Accounts and examination results are saved securely online. Email verification and password recovery are not available yet."
+                  : " Local prototype accounts are saved on this computer. Email verification and password recovery are not available yet. ",
               )}
             </p>
           </section>

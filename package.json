@@ -15,6 +15,7 @@
     "@radix-ui/react-dialog": "^1.1.15",
     "lucide-react": "^0.577.0",
     "next": "^16.2.0",
+    "pg": "^8.23.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "zod": "^4.3.6"
@@ -27,6 +28,7 @@
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",
     "@types/node": "^24.0.0",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "eslint": "^9.39.5",
@@ -37,5 +39,8 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.71.0",
     "vitest": "^5.0.2"
+  },
+  "engines": {
+    "node": "24.x"
   }
 }

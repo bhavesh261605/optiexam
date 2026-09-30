@@ -1,0 +1,10 @@
+.git
+.next
+.venv
+.env*
+data
+backend
+test-results
+playwright-report
+coverage
+*.log

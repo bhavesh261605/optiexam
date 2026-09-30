@@ -1,12 +1,10 @@
 import { createHmac, createHash, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import * as store from "./store";
-
 function sign(payload: object, secret: string) {
   const data = `${Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url")}.${Buffer.from(JSON.stringify(payload)).toString("base64url")}`;
   return `${data}.${createHmac("sha256", secret).update(data).digest("base64url")}`;
 }
-
 function verify(token: string, secret: string, subject: string) {
   const [header, payload, signature, extra] = token.split(".");
   if (!header || !payload || !signature || extra)
@@ -35,9 +33,12 @@ function verify(token: string, secret: string, subject: string) {
     !p.amr.includes("voice")
   )
     throw new Error("Invalid voice token claims");
-  return p as { sub: string; jti: string; exp: number };
+  return p as {
+    sub: string;
+    jti: string;
+    exp: number;
+  };
 }
-
 export async function voiceRequest(req: NextRequest, action: string) {
   const secret = process.env.VOICE_JWT_SECRET;
   const base = process.env.VOICE_SERVICE_URL || "http://127.0.0.1:8001";
@@ -108,7 +109,7 @@ export async function voiceRequest(req: NextRequest, action: string) {
   const scope = action === "challenge" ? body?.purpose : action;
   if (!scope || !["enroll", "login", "transcribe"].includes(scope))
     throw new store.ApiError("Invalid voice action.");
-  const user = store.session(req.cookies.get("aura_session")?.value);
+  const user = await store.session(req.cookies.get("aura_session")?.value);
   let subject: string;
   if (scope === "login") {
     const identifier = String(body?.identifier || form?.get("identifier") || "")
@@ -117,7 +118,7 @@ export async function voiceRequest(req: NextRequest, action: string) {
     if (!identifier || identifier.length > 254)
       throw new store.ApiError("Enter your account email or voice account ID.");
     subject =
-      store.voiceIdentity(identifier) ||
+      (await store.voiceIdentity(identifier)) ||
       `unknown:${createHash("sha256").update(identifier).digest("hex")}`;
   } else {
     if (!user || user.role !== "candidate")
@@ -175,7 +176,11 @@ export async function voiceRequest(req: NextRequest, action: string) {
       );
     if (action === "login") {
       const claims = verify(data.access_token, secret, subject);
-      const session = store.voiceLogin(claims.sub, claims.jti, claims.exp);
+      const session = await store.voiceLogin(
+        claims.sub,
+        claims.jti,
+        claims.exp,
+      );
       const result = NextResponse.json(
         { user: session.user },
         { headers: { "Cache-Control": "no-store" } },
